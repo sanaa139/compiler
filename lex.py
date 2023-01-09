@@ -52,11 +52,10 @@ class CompilerLexer(Lexer):
     RIGHT_PARENTHESIS = r'\)'
 
     ignore = r' \t'
-    
-    ignore_newline = r'\n+'
         
     ignore_comment = r'^\[.*\]'
 
+    ignore_new_lines = r'\n+'
     NUM = r'\d+'
     ID = r'[_a-z]+'
 
