@@ -49,21 +49,23 @@ class CompilerParser(Parser):
     def command(self,p):
         # gdy expression to NUM
         if type(p.expression) == int:
-            self.writeToOutput("SET " + str(p.expression))
+            if not str(self.output[len(self.output) - 1]).startswith('ADD'):
+                self.writeToOutput("SET " + str(p.expression))
             if p.ID in self.p_cells:
-                self.writeToOutput("ADD " + str(self.p_cells[p.ID]))
+                self.writeToOutput("STORE " + str(self.p_cells[p.ID]))
+                self.values_of_var[p.ID] = int(p.expression)
             else:
                 raise Exception("Nie istnieje zmienna " + str(p.ID))
         # gdy expression to ID
         elif p.expression in self.p_cells:
             self.writeToOutput("LOAD " + str(self.p_cells[p.expression]))
             if p.ID in self.p_cells:
-                self.writeToOutput("ADD " + str(self.p_cells[p.ID]))
+                self.writeToOutput("STORE " + str(self.p_cells[p.ID]))
+                self.values_of_var[p.ID] = self.values_of_var[p.expression]
             else:
                 raise Exception("Nie istnieje zmienna " + str(p.ID))
         else:
             raise Exception("Nie istnieje zmienna " + str(p.expression))
-        self.writeToOutput("STORE " + str(self.p_cells[p.ID]))
     
     @_('declarations COMMA ID')
     def declarations(self,p):
@@ -84,7 +86,34 @@ class CompilerParser(Parser):
     
     @_('value PLUS value')
     def expression(self,p):
-        pass
+        # gdy value1 to NUM
+        if type(p.value1) == int:
+            # gdy value0 to NUM
+            if type(p.value0) == int:
+                return p.value0 + p.value1
+            # gdy value0 to ID
+            elif p.value0 in self.p_cells:
+                self.writeToOutput("SET " + str(p.value1))
+                self.writeToOutput("ADD " + str(self.p_cells[p.value0]))
+                return self.values_of_var[p.value0] + p.value1
+            else:
+                raise Exception("Nie istnieje zmienna " + str(p.value0))
+        # gdy value1 to ID
+        elif p.value1 in self.p_cells:
+            # gdy value0 to NUM
+            if type(p.value0) == int:
+                self.writeToOutput("STORE " + str(p.value0))
+                self.writeToOutput("ADD " + str(self.p_cells[p.value1]))
+                return p.value0 + self.values_of_var[p.value1]
+            # gdy value0 to ID
+            if p.value0 in self.p_cells:
+                self.writeToOutput("LOAD " + str(self.p_cells[p.value1]))
+                self.writeToOutput("ADD " + str(self.p_cells[p.value0]))
+                return self.values_of_var[p.value0] + self.values_of_var[p.value1]
+            else:
+                raise Exception("Nie istnieje zmienna " + str(p.value0))
+        else:
+            raise Exception("Nie istnieje zmienna " + str(p.value1))
     
     @_('NUM')
     def value(self, p):
@@ -121,5 +150,9 @@ if __name__ == '__main__':
     parser = CompilerParser()
     #pprint(list(lexer.tokenize(data)))
     parser.parse(lexer.tokenize(data))
+    print("Output:")
     print(parser.output)
+    print("P_cells:")
     print(parser.p_cells)
+    print("value of var:")
+    print(parser.values_of_var)
