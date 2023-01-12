@@ -2,6 +2,7 @@ from sly import Parser
 from lex import CompilerLexer
 import sys
 from pprint import pprint
+import asm
 
 class CompilerParser(Parser):
     tokens = CompilerLexer.tokens
@@ -13,15 +14,12 @@ class CompilerParser(Parser):
         
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
-        main_output_instrutions = p.declarations + p.commands + ["HALT"]
+        main_output_instructions = p.declarations + p.commands + ["HALT"]
         print(p.declarations)
         print(p.commands)
-        print(main_output_instrutions)
-        f = open("./moje_wyniki/wyniki.mr", "w")
-        for i in main_output_instrutions:
-            f.write(f"{i} \n")
-        f.close()
-        
+        print(main_output_instructions)
+        with open("./moje_wyniki/wyniki.mr", "w") as file:
+            file.write("\n".join(main_output_instructions))
         
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):   
@@ -51,17 +49,19 @@ class CompilerParser(Parser):
     @_('READ ID SEMICOLON')
     def command(self,p):
         if p.ID in self.p_cells:
-            return [f"GET {self.p_cells[p.ID]}"]
+            return [asm.get(self.p_cells[p.ID])]
         else:
-            raise Exception("Nie istnieje zmienna " + str(p.ID))
+            raise Exception(f"Nie istnieje zmienna {p.ID}")
     
     @_('WRITE value SEMICOLON')
     def command(self,p):
         if p.value in self.p_cells:
-            self.writeToOutput("PUT " + str(self.p_cells[p.value]))
+            return [f"PUT {self.p_cells[p.value]}"]
         elif type(p.value) == int:
-            self.writeToOutput("SET " + str(p.value))
-            self.writeToOutput("PUT 0")
+            return [
+                f"SET {p.value}",
+                f"PUT {0}"
+            ]
         else:
             raise Exception("Nie istnieje zmienna " + str(p.value))
 
@@ -156,19 +156,19 @@ class CompilerParser(Parser):
 
     @_('value GREATER_THAN value')
     def condition(self, p):
-        if(type(p.value0) != int and type(p.value1) != int):
+        if(type(p.value0) == str and type(p.value1) == str):
             return ([
                 f"LOAD {self.p_cells[p.value0]}", 
                 f"SUB {self.p_cells[p.value1]}"
             ], "JZERO")
-        elif(type(p.value0) != int and type(p.value1) == int):
+        elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 f"SET {self.p_cells[p.value1]}",
                 f"STORE {1}",
                 f"LOAD {self.p_cells[p.value0]}",
                 f"SUB {1}"
             ], "JZERO")
-        elif(type(p.value0) == int and type(p.value1) != int):
+        elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 f"SET {self.p_cells[p.value0]}", 
                 f"SUB {self.p_cells[p.value1]}"
@@ -180,17 +180,17 @@ class CompilerParser(Parser):
         
     @_('value LESS_THAN value')
     def condition(self, p):
-        if(type(p.value0) != int and type(p.value1) != int):
+        if(type(p.value0) == str and type(p.value1) == str):
             return ([
                 f"LOAD {self.p_cells[p.value1]}", 
                 f"SUB {self.p_cells[p.value0]}"
             ], "JZERO")
-        elif(type(p.value0) != int and type(p.value1) == int):
+        elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 f"SET {self.p_cells[p.value1]}", 
                 f"SUB {self.p_cells[p.value0]}"
             ], "JZERO")
-        elif(type(p.value0) == int and type(p.value1) != int):
+        elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 f"SET {self.p_cells[p.value0]}", 
                 f"STORE {1}", 
