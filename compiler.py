@@ -9,6 +9,7 @@ class CompilerParser(Parser):
     p_cells = {}
     values_of_var = {}
     number_of_var = 1
+    label_id = 0
         
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
@@ -24,6 +25,19 @@ class CompilerParser(Parser):
     
     @_('command')
     def commands(self,p):
+        pass
+        
+    @_('IF condition THEN commands ENDIF')
+    def command(self,p):
+        endif_label = self.get_label()
+        instructions_from_cond, jump_type = p.condition
+        jump_type += f" {endif_label}"
+        instructions_from_cond += jump_type
+        return instructions_from_cond + p.commands
+         
+    
+    @_('WHILE condition DO commands ENDWHILE')
+    def command(self,p):
         pass
         
     @_('READ ID SEMICOLON')
@@ -115,6 +129,11 @@ class CompilerParser(Parser):
         else:
             raise Exception("Nie istnieje zmienna " + str(p.value1))
     
+    @_('value MINUS value')
+    def expression(self,p):
+        
+        pass
+    
     @_('NUM')
     def value(self, p):
         return int(p.NUM)
@@ -123,23 +142,47 @@ class CompilerParser(Parser):
     def value(self, p):
         return p.ID
     
-    
-    
-    
-    
-    
+    @_('value EQ value')
+    def condition(self, p):
         
-    def add_to_p_cells(self, elem):
-        self.p_cells['0'] = elem
+
+    @_('value NEQ value')
+    def condition(self, p):
+        pass
+
+    @_('value GREATER_THAN value')
+    def condition(self, p):
+        if(type(p.value0) != int and type(p.value1) != int):
+            return ([
+                f"LOAD {self.p_cells[p.value0]}", 
+                f"SUB {self.p_cells[p.value1]}"
+            ], "JZERO")
+        
+            
+
+    @_('value LESS_THAN value')
+    def condition(self, p):
+        pass
+
+    @_('value GREATER_THAN_OR_EQUAL value')
+    def condition(self, p):
+        pass
+
+    @_('value LESS_THAN_OR_EQUAL value')
+    def condition(self, p):
+        pass
+    
+    
+    
     
     def writeToOutput(self, s):
         self.output.append(s)
         
-    def getKey(self, value):
-        for key in self.p_cells:
-            if self.p_cells[key] == value:
-                return key
-        return -1
+    def get_label(self):
+        label = "E_" + str(self.label_id)
+        self.label_id += 1
+        return label
+        
         
     
 if __name__ == '__main__':
@@ -150,9 +193,17 @@ if __name__ == '__main__':
     parser = CompilerParser()
     #pprint(list(lexer.tokenize(data)))
     parser.parse(lexer.tokenize(data))
+    
+    parser.output.append("HALT")
+    
     print("Output:")
     print(parser.output)
     print("P_cells:")
     print(parser.p_cells)
     print("value of var:")
     print(parser.values_of_var)
+
+    f = open("./moje_wyniki/wyniki.mr", "w")
+    for i in range (0, len(parser.output)):
+        f.write(parser.output[i] + "\n")
+    f.close()
