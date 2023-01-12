@@ -8,12 +8,20 @@ class CompilerParser(Parser):
     output = []
     p_cells = {}
     values_of_var = {}
-    number_of_var = 1
+    number_of_var = 2
     label_id = 0
         
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
-        pass
+        main_output_instrutions = p.declarations + p.commands + ["HALT"]
+        print(p.declarations)
+        print(p.commands)
+        print(main_output_instrutions)
+        f = open("./moje_wyniki/wyniki.mr", "w")
+        for i in main_output_instrutions:
+            f.write(f"{i} \n")
+        f.close()
+        
         
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):   
@@ -21,11 +29,11 @@ class CompilerParser(Parser):
         
     @_('commands command')
     def commands(self,p):
-        pass
+        return p.commands + p.command
     
     @_('command')
     def commands(self,p):
-        pass
+        return p.command
         
     @_('IF condition THEN commands ENDIF')
     def command(self,p):
@@ -43,8 +51,7 @@ class CompilerParser(Parser):
     @_('READ ID SEMICOLON')
     def command(self,p):
         if p.ID in self.p_cells:
-            #DAC WCZYTYWANIE WARTOSCI Z KLAWIATURY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            self.values_of_var[p.ID] = 1
+            return [f"GET {self.p_cells[p.ID]}"]
         else:
             raise Exception("Nie istnieje zmienna " + str(p.ID))
     
@@ -83,16 +90,13 @@ class CompilerParser(Parser):
     
     @_('declarations COMMA ID')
     def declarations(self,p):
-        self.p_cells[p.ID] = self.number_of_var
-        self.writeToOutput('GET ' + str(self.number_of_var))
-        self.number_of_var += 1
+        self.p_cells[p.ID] = self.get_available_index()
+        return []
     
     @_('ID')
     def declarations(self,p):
-        self.p_cells[p.ID] = self.number_of_var
-        self.writeToOutput('GET ' + str(self.number_of_var))
-        self.number_of_var += 1
-        pass
+        self.p_cells[p.ID] = self.get_available_index()
+        return []
     
     @_('value')
     def expression(self,p):
@@ -144,7 +148,7 @@ class CompilerParser(Parser):
     
     @_('value EQ value')
     def condition(self, p):
-        
+        pass
 
     @_('value NEQ value')
     def condition(self, p):
@@ -157,12 +161,45 @@ class CompilerParser(Parser):
                 f"LOAD {self.p_cells[p.value0]}", 
                 f"SUB {self.p_cells[p.value1]}"
             ], "JZERO")
-        
+        elif(type(p.value0) != int and type(p.value1) == int):
+            return ([
+                f"SET {self.p_cells[p.value1]}",
+                f"STORE {1}",
+                f"LOAD {self.p_cells[p.value0]}",
+                f"SUB {1}"
+            ], "JZERO")
+        elif(type(p.value0) == int and type(p.value1) != int):
+            return ([
+                f"SET {self.p_cells[p.value0]}", 
+                f"SUB {self.p_cells[p.value1]}"
+            ], "JZERO")
+        else:
+            if not(p.value0 > p.value1):
+                return ([], "JZERO")
             
-
+        
     @_('value LESS_THAN value')
     def condition(self, p):
-        pass
+        if(type(p.value0) != int and type(p.value1) != int):
+            return ([
+                f"LOAD {self.p_cells[p.value1]}", 
+                f"SUB {self.p_cells[p.value0]}"
+            ], "JZERO")
+        elif(type(p.value0) != int and type(p.value1) == int):
+            return ([
+                f"SET {self.p_cells[p.value1]}", 
+                f"SUB {self.p_cells[p.value0]}"
+            ], "JZERO")
+        elif(type(p.value0) == int and type(p.value1) != int):
+            return ([
+                f"SET {self.p_cells[p.value0]}", 
+                f"STORE {1}", 
+                f"LOAD {self.p_cells[p.value1]}"
+                f"SUB {1}"
+            ], "JZERO")
+        else:
+            if not(p.value0 < p.value1):
+                return ([], "JZERO")
 
     @_('value GREATER_THAN_OR_EQUAL value')
     def condition(self, p):
@@ -182,6 +219,11 @@ class CompilerParser(Parser):
         label = "E_" + str(self.label_id)
         self.label_id += 1
         return label
+    
+    def get_available_index(self):
+        index = self.number_of_var
+        self.number_of_var += 1
+        return index
         
         
     
@@ -202,8 +244,3 @@ if __name__ == '__main__':
     print(parser.p_cells)
     print("value of var:")
     print(parser.values_of_var)
-
-    f = open("./moje_wyniki/wyniki.mr", "w")
-    for i in range (0, len(parser.output)):
-        f.write(parser.output[i] + "\n")
-    f.close()
