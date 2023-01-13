@@ -43,10 +43,12 @@ class CompilerParser(Parser):
         output = []
 
         instructions_from_cond, jump_type = p.condition
+        #print("wrr")
+        #print(instructions_from_cond, " ", jump_type)
         jump_type += f" {endif_label}"
     
-        output += instructions_from_cond + [jump_type] + [endif_label]
-        return output + p.commands
+        output += instructions_from_cond + [jump_type]
+        return output + p.commands + [endif_label]
          
     
     @_('WHILE condition DO commands ENDWHILE')
@@ -156,7 +158,42 @@ class CompilerParser(Parser):
     
     @_('value EQ value')
     def condition(self, p):
-        pass
+        if(type(p.value0) == str and type(p.value1) == str):
+            return ([
+                asm.load(self.p_cells[p.value0]),
+                asm.sub(self.p_cells[p.value1]),
+                asm.store(1),
+                asm.load(self.p_cells[p.value1]),
+                asm.sub(self.p_cells[p.value0]),
+                asm.add(1)
+            ], asm.jpos())
+        elif(type(p.value0) == str and type(p.value1) == int):
+            return ([
+                asm.set(p.value1),
+                asm.store(1),
+                asm.load(self.p_cells[p.value0]),
+                asm.sub(1),
+                asm.store(1),
+                asm.set(p.value1),
+                asm.sub(self.p_cells[p.value0]),
+                asm.add(1)
+            ], asm.jpos())
+        elif(type(p.value0) == int and type(p.value1) == str):
+            return ([
+                asm.set(p.value0),
+                asm.store(1),
+                asm.load(self.p_cells[p.value1]),
+                asm.sub(1),
+                asm.store(1),
+                asm.set(p.value0),
+                asm.sub(self.p_cells[p.value1]),
+                asm.add(1)
+            ], asm.jpos())
+        elif(type(p.value0) == int and type(p.value1) == int):
+            if not(p.value0 == p.value1):
+                return ([], asm.jzero())
+            else:
+                return ([], "!")
 
     @_('value NEQ value')
     def condition(self, p):
@@ -164,15 +201,12 @@ class CompilerParser(Parser):
 
     @_('value GREATER_THAN value')
     def condition(self, p):
-        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
         if(type(p.value0) == str and type(p.value1) == str):
-            print("WRRRRRRRRRRRR1")
             return ([
                 asm.load(self.p_cells[p.value0]), 
                 asm.sub(self.p_cells[p.value1]),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
-            print("WRRRRRRRRRRRR2")
             return ([
                 asm.set(p.value1),
                 asm.store(1),
@@ -180,7 +214,6 @@ class CompilerParser(Parser):
                 asm.sub(1)
             ], "JZERO ")
         elif(type(p.value0) == int and type(p.value1) == str):
-            print("WRRRRRRRRRRRR3")
             return ([
                 asm.set(self.p_cells[p.value1]), 
                 asm.store(1),
@@ -189,7 +222,6 @@ class CompilerParser(Parser):
             ], asm.jzero())
         else:
             if not(p.value0 > p.value1):
-                print("BBBBBBBBBBBBBBBB")
                 return ([], asm.jzero())
             
         
@@ -242,19 +274,22 @@ class CompilerParser(Parser):
     
     def delete_labels(self, instructions):
         all_labels = []
-        index = 1
+        index = 0
         for instruction in instructions:
             if instruction.startswith('E'):
                 all_labels.append((instruction, index))
                 instructions.remove(instruction)
             else:
                 index += 1
-        
+        print(all_labels)
         for index, instruction in enumerate(instructions):
             for label in all_labels:
                 if instruction.endswith(label[0]):
-                    first_word_instruction = instruction.split()[0]
-                    instructions[index] = first_word_instruction + " " + str(label[1])
+                    if instruction.startswith("!"):
+                        instructions.remove(instruction)
+                    else:
+                        first_word_instruction = instruction.split()[0]
+                        instructions[index] = first_word_instruction + " " + str(label[1])
         
         return instructions
     

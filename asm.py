@@ -19,5 +19,8 @@ def add(num: int):
 def jzero():
     return f"JZERO "
 
+def jpos():
+    return f"JPOS "
+
 def store(num: int):
     return f"STORE {num}"

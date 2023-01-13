@@ -39,7 +39,7 @@ class CompilerLexer(Lexer):
     MUL = r'\*'
     DIV = r'/'
     MOD = r'\%'
-    EQ = r'=='
+    EQ = r'='
     NEQ = r'!='
     GREATER_THAN = r'>'
     LESS_THAN = r'<'
