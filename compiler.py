@@ -355,13 +355,22 @@ class CompilerParser(Parser):
     
     def delete_labels(self, instructions):
         all_labels = []
-        index = 0
-        for instruction in instructions:
+        indexes_to_delete = []
+        indexOfInstructions = 0
+        
+        k = 0
+        for index, instruction in enumerate(instructions):
+            print(instruction, " ", index)
             if instruction.startswith('E'):
-                all_labels.append((instruction, index))
-                instructions.remove(instruction)
+                all_labels.append((instruction, indexOfInstructions))
+                indexes_to_delete.append(index - k)
+                k += 1
             else:
-                index += 1
+                indexOfInstructions += 1
+                
+        for index in indexes_to_delete:
+            instructions.pop(index)
+            
         print(all_labels)
         for index, instruction in enumerate(instructions):
             for label in all_labels:
