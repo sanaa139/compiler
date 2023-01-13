@@ -191,13 +191,48 @@ class CompilerParser(Parser):
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
             if not(p.value0 == p.value1):
-                return ([], asm.jzero())
+                return ([], asm.jump())
             else:
                 return ([], "!")
 
     @_('value NEQ value')
     def condition(self, p):
-        pass
+        if(type(p.value0) == str and type(p.value1) == str):
+            return ([
+                asm.load(self.p_cells[p.value0]),
+                asm.sub(self.p_cells[p.value1]),
+                asm.store(1),
+                asm.load(self.p_cells[p.value1]),
+                asm.sub(self.p_cells[p.value0]),
+                asm.add(1)
+            ], asm.jzero())
+        elif(type(p.value0) == str and type(p.value1) == int):
+            return ([
+                asm.set(p.value1),
+                asm.store(1),
+                asm.load(self.p_cells[p.value0]),
+                asm.sub(1),
+                asm.store(1),
+                asm.set(p.value1),
+                asm.sub(self.p_cells[p.value0]),
+                asm.add(1)
+            ], asm.jzero())
+        elif(type(p.value0) == int and type(p.value1) == str):
+            return ([
+                asm.set(p.value0),
+                asm.store(1),
+                asm.load(self.p_cells[p.value1]),
+                asm.sub(1),
+                asm.store(1),
+                asm.set(p.value0),
+                asm.sub(self.p_cells[p.value1]),
+                asm.add(1)
+            ], asm.jzero())
+        elif(type(p.value0) == int and type(p.value1) == int):
+            if not(p.value0 != p.value1):
+                return ([], asm.jump())
+            else:
+                return ([], "!")
 
     @_('value GREATER_THAN value')
     def condition(self, p):
