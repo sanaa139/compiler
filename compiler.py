@@ -6,7 +6,6 @@ import asm
 
 class CompilerParser(Parser):
     tokens = CompilerLexer.tokens
-    output = []
     p_cells = {}
     values_of_var = {}
     number_of_var = 2
@@ -18,6 +17,10 @@ class CompilerParser(Parser):
         print(p.declarations)
         print(p.commands)
         print(main_output_instructions)
+        main_output_instructions = self.delete_labels(main_output_instructions)
+                
+        print(main_output_instructions)
+        
         with open("./moje_wyniki/wyniki.mr", "w") as file:
             file.write("\n".join(main_output_instructions))
         
@@ -35,11 +38,15 @@ class CompilerParser(Parser):
         
     @_('IF condition THEN commands ENDIF')
     def command(self,p):
+        print("IF condition THEN commands ENDIF")
         endif_label = self.get_label()
+        output = []
+
         instructions_from_cond, jump_type = p.condition
         jump_type += f" {endif_label}"
-        instructions_from_cond += jump_type
-        return instructions_from_cond + p.commands
+    
+        output += instructions_from_cond + [jump_type] + [endif_label]
+        return output + p.commands
          
     
     @_('WHILE condition DO commands ENDWHILE')
@@ -157,25 +164,32 @@ class CompilerParser(Parser):
 
     @_('value GREATER_THAN value')
     def condition(self, p):
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
         if(type(p.value0) == str and type(p.value1) == str):
+            print("WRRRRRRRRRRRR1")
             return ([
                 asm.load(self.p_cells[p.value0]), 
                 asm.sub(self.p_cells[p.value1]),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
+            print("WRRRRRRRRRRRR2")
             return ([
-                asm.set(self.p_cells[p.value1]),
+                asm.set(p.value1),
                 asm.store(1),
                 asm.load(self.p_cells[p.value0]),
                 asm.sub(1)
-            ], asm.jzero())
+            ], "JZERO ")
         elif(type(p.value0) == int and type(p.value1) == str):
+            print("WRRRRRRRRRRRR3")
             return ([
-                asm.set(self.p_cells[p.value0]), 
-                asm.set(self.p_cells[p.value1]),
+                asm.set(self.p_cells[p.value1]), 
+                asm.store(1),
+                asm.set(self.p_cells[p.value0]),
+                asm.sub(1)
             ], asm.jzero())
         else:
             if not(p.value0 > p.value1):
+                print("BBBBBBBBBBBBBBBB")
                 return ([], asm.jzero())
             
         
@@ -225,8 +239,24 @@ class CompilerParser(Parser):
         index = self.number_of_var
         self.number_of_var += 1
         return index
+    
+    def delete_labels(self, instructions):
+        all_labels = []
+        index = 1
+        for instruction in instructions:
+            if instruction.startswith('E'):
+                all_labels.append((instruction, index))
+                instructions.remove(instruction)
+            else:
+                index += 1
         
+        for index, instruction in enumerate(instructions):
+            for label in all_labels:
+                if instruction.endswith(label[0]):
+                    first_word_instruction = instruction.split()[0]
+                    instructions[index] = first_word_instruction + " " + str(label[1])
         
+        return instructions
     
 if __name__ == '__main__':
     with open(sys.argv[1], 'r') as f:
@@ -234,13 +264,9 @@ if __name__ == '__main__':
     print(data)
     lexer = CompilerLexer()
     parser = CompilerParser()
-    #pprint(list(lexer.tokenize(data)))
+    #print(list(lexer.tokenize(data)))
     parser.parse(lexer.tokenize(data))
-    
-    parser.output.append("HALT")
-    
-    print("Output:")
-    print(parser.output)
+
     print("P_cells:")
     print(parser.p_cells)
     print("value of var:")
