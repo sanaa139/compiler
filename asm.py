@@ -22,5 +22,8 @@ def jzero():
 def jpos():
     return f"JPOS "
 
+def jump():
+    return f"JUMP "
+
 def store(num: int):
     return f"STORE {num}"
