@@ -99,7 +99,7 @@ class CompilerParser(Parser):
     @_('value PLUS value')
     def expression(self,p):
         output = []
-        # gdy value1 to NUM
+        
         if type(p.value0) == int and type(p.value1) == int:
             return (p.value0 + p.value1, "not_operation")
         elif type(p.value0) == str and type(p.value1) == int:
@@ -116,6 +116,26 @@ class CompilerParser(Parser):
     
     @_('value MINUS value')
     def expression(self,p):
+        output = []
+        
+        if type(p.value0) == int and type(p.value1) == int:
+            if(p.value0 - p.value1 < 0):
+                return (0, "not_operation")
+            else:
+                return (p.value0 - p.value1, "not_operation")
+        elif type(p.value0) == str and type(p.value1) == int:
+            output.append(asm.set(p.value1))
+            output.append(asm.store(1))
+            output.append(asm.load(self.p_cells[p.value0]))
+            output.append(asm.sub(1))
+        elif type(p.value0) == int and type(p.value1) == str:
+            output.append(asm.set(p.value0))
+            output.append(asm.sub(self.p_cells[p.value1]))
+        elif type(p.value0) == str and type(p.value1) == str:
+            output.append(asm.load(self.p_cells[p.value0]))
+            output.append(asm.sub(self.p_cells[p.value1]))
+        
+        return (output, "operation")
         
         pass
     
