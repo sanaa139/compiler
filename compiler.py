@@ -59,8 +59,8 @@ class CompilerParser(Parser):
             return [f"PUT {self.p_cells[p.value]}"]
         elif type(p.value) == int:
             return [
-                f"SET {p.value}",
-                f"PUT {0}"
+                asm.set(p.value),
+                asm.put(0)
             ]
         else:
             raise Exception("Nie istnieje zmienna " + str(p.value))
@@ -68,25 +68,19 @@ class CompilerParser(Parser):
     
     @_('ID ASSIGN expression SEMICOLON')
     def command(self,p):
-        # gdy expression to NUM
-        if type(p.expression) == int:
-            if not str(self.output[len(self.output) - 1]).startswith('ADD'):
-                self.writeToOutput("SET " + str(p.expression))
-            if p.ID in self.p_cells:
-                self.writeToOutput("STORE " + str(self.p_cells[p.ID]))
-                self.values_of_var[p.ID] = int(p.expression)
+        output = []
+        
+        if(p.expression[1] == "not_operation"):
+            if(type(p.expression[0]) == int):
+                output.append(asm.set(p.expression[0]))
+                output.append(asm.store(self.p_cells[p.ID]))
             else:
-                raise Exception("Nie istnieje zmienna " + str(p.ID))
-        # gdy expression to ID
-        elif p.expression in self.p_cells:
-            self.writeToOutput("LOAD " + str(self.p_cells[p.expression]))
-            if p.ID in self.p_cells:
-                self.writeToOutput("STORE " + str(self.p_cells[p.ID]))
-                self.values_of_var[p.ID] = self.values_of_var[p.expression]
-            else:
-                raise Exception("Nie istnieje zmienna " + str(p.ID))
+                output.append(asm.load(self.p_cells[p.expression[0]]))
+                output.append(asm.store(self.p_cells[p.ID]))
         else:
-            raise Exception("Nie istnieje zmienna " + str(p.expression))
+            output += p.expression[0] + [asm.store(self.p_cells[p.ID])]
+            
+        return output
     
     @_('declarations COMMA ID')
     def declarations(self,p):
@@ -100,38 +94,25 @@ class CompilerParser(Parser):
     
     @_('value')
     def expression(self,p):
-        return p.value
+        return (p.value, "not_operation")
     
     @_('value PLUS value')
     def expression(self,p):
+        output = []
         # gdy value1 to NUM
-        if type(p.value1) == int:
-            # gdy value0 to NUM
-            if type(p.value0) == int:
-                return p.value0 + p.value1
-            # gdy value0 to ID
-            elif p.value0 in self.p_cells:
-                self.writeToOutput("SET " + str(p.value1))
-                self.writeToOutput("ADD " + str(self.p_cells[p.value0]))
-                return self.values_of_var[p.value0] + p.value1
-            else:
-                raise Exception("Nie istnieje zmienna " + str(p.value0))
-        # gdy value1 to ID
-        elif p.value1 in self.p_cells:
-            # gdy value0 to NUM
-            if type(p.value0) == int:
-                self.writeToOutput("STORE " + str(p.value0))
-                self.writeToOutput("ADD " + str(self.p_cells[p.value1]))
-                return p.value0 + self.values_of_var[p.value1]
-            # gdy value0 to ID
-            if p.value0 in self.p_cells:
-                self.writeToOutput("LOAD " + str(self.p_cells[p.value1]))
-                self.writeToOutput("ADD " + str(self.p_cells[p.value0]))
-                return self.values_of_var[p.value0] + self.values_of_var[p.value1]
-            else:
-                raise Exception("Nie istnieje zmienna " + str(p.value0))
-        else:
-            raise Exception("Nie istnieje zmienna " + str(p.value1))
+        if type(p.value0) == int and type(p.value1) == int:
+            return (p.value0 + p.value1, "not_operation")
+        elif type(p.value0) == str and type(p.value1) == int:
+            output.append(asm.set(p.value1))
+            output.append(asm.add(self.p_cells[p.value0]))
+        elif type(p.value0) == int and type(p.value1) == str:
+            output.append(asm.set(p.value0))
+            output.append(asm.add(self.p_cells[p.value1]))
+        elif type(p.value0) == str and type(p.value1) == str:
+            output.append(asm.load(self.p_cells[p.value0]))
+            output.append(asm.add(self.p_cells[p.value1]))
+        
+        return (output, "operation")
     
     @_('value MINUS value')
     def expression(self,p):
@@ -158,48 +139,48 @@ class CompilerParser(Parser):
     def condition(self, p):
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                f"LOAD {self.p_cells[p.value0]}", 
-                f"SUB {self.p_cells[p.value1]}"
-            ], "JZERO")
+                asm.load(self.p_cells[p.value0]), 
+                asm.sub(self.p_cells[p.value1]),
+            ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
-                f"SET {self.p_cells[p.value1]}",
-                f"STORE {1}",
-                f"LOAD {self.p_cells[p.value0]}",
-                f"SUB {1}"
-            ], "JZERO")
+                asm.set(self.p_cells[p.value1]),
+                asm.store(1),
+                asm.load(self.p_cells[p.value0]),
+                asm.sub(1)
+            ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                f"SET {self.p_cells[p.value0]}", 
-                f"SUB {self.p_cells[p.value1]}"
-            ], "JZERO")
+                asm.set(self.p_cells[p.value0]), 
+                asm.set(self.p_cells[p.value1]),
+            ], asm.jzero())
         else:
             if not(p.value0 > p.value1):
-                return ([], "JZERO")
+                return ([], asm.jzero())
             
         
     @_('value LESS_THAN value')
     def condition(self, p):
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                f"LOAD {self.p_cells[p.value1]}", 
-                f"SUB {self.p_cells[p.value0]}"
-            ], "JZERO")
+                asm.load(self.p_cells[p.value1]), 
+                asm.sub(self.p_cells[p.value0]),
+            ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
-                f"SET {self.p_cells[p.value1]}", 
-                f"SUB {self.p_cells[p.value0]}"
-            ], "JZERO")
+                asm.set(self.p_cells[p.value1]), 
+                asm.sub(self.p_cells[p.value0])
+            ], asm.jzero)
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                f"SET {self.p_cells[p.value0]}", 
-                f"STORE {1}", 
-                f"LOAD {self.p_cells[p.value1]}"
-                f"SUB {1}"
-            ], "JZERO")
+                asm.set(self.p_cells[p.value0]), 
+                asm.store(1), 
+                asm.load(self.p_cells[p.value1]),
+                asm.sub(1)
+            ], asm.load())
         else:
             if not(p.value0 < p.value1):
-                return ([], "JZERO")
+                return ([], asm.jzero())
 
     @_('value GREATER_THAN_OR_EQUAL value')
     def condition(self, p):
