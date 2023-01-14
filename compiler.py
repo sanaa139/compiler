@@ -38,7 +38,6 @@ class CompilerParser(Parser):
         
     @_('IF condition THEN commands ENDIF')
     def command(self,p):
-        print("IF condition THEN commands ENDIF")
         endif_label = self.get_label()
         output = []
 
@@ -51,7 +50,17 @@ class CompilerParser(Parser):
     
     @_('WHILE condition DO commands ENDWHILE')
     def command(self,p):
-        pass
+        endwhile_label = self.get_label()
+        go_to_while_label = self.get_label()
+        output = [go_to_while_label]
+
+        instructions_from_cond, jump_type = p.condition
+        jump_type += f" {endwhile_label}"
+        jump_to_while = asm.jump()
+        jump_to_while += f"{go_to_while_label}"
+    
+        output += instructions_from_cond + [jump_type]
+        return output + p.commands  + [jump_to_while] + [endwhile_label]
         
     @_('READ ID SEMICOLON')
     def command(self,p):
@@ -249,7 +258,7 @@ class CompilerParser(Parser):
                 asm.store(1),
                 asm.load(self.p_cells[p.value0]),
                 asm.sub(1)
-            ], "JZERO ")
+            ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(self.p_cells[p.value1]), 
@@ -273,9 +282,9 @@ class CompilerParser(Parser):
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
-                asm.set(self.p_cells[p.value1]), 
+                asm.set(p.value1), 
                 asm.sub(self.p_cells[p.value0])
-            ], asm.jzero)
+            ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(self.p_cells[p.value0]), 

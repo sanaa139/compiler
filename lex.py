@@ -4,11 +4,11 @@ import sys
 class CompilerLexer(Lexer):
     tokens = {
         'IF', 'THEN', 'ELSE', 'ENDIF',
+        'WHILE', 'DO', 'ENDWHILE',
+        'REPEAT', 'UNTIL',
         'PROCEDURE', 'IS', 'VAR', 'BEGIN', 'BEGIN', 'END',
         'PROGRAM',
         'ASSIGN',
-        'WHILE', 'DO', 'ENDWHILE',
-        'REPEAT', 'UNTIL',
         'READ', 'WRITE',
         'PLUS', 'MINUS', 'MUL', 'DIV', 'MOD',
         'EQ', 'NEQ', 'GREATER_THAN', 'LESS_THAN', 'GREATER_THAN_OR_EQUAL', 'LESS_THAN_OR_EQUAL',
@@ -20,6 +20,11 @@ class CompilerLexer(Lexer):
     THEN = r'THEN'
     ELSE = r'ELSE'
     ENDIF = r'ENDIF'
+    WHILE = r'WHILE'
+    DO = r'DO'
+    ENDWHILE =r'ENDWHILE'
+    REPEAT = r'REPEAT'
+    UNTIL = r'UNTIL'
     PROCEDURE = r'PROCEDURE'
     IS = r'IS'
     VAR = r'VAR'
@@ -27,11 +32,6 @@ class CompilerLexer(Lexer):
     END = r'END'
     PROGRAM = r'PROGRAM'
     ASSIGN = r':='
-    WHILE = r'WHILE'
-    DO = r'DO'
-    ENDWHILE =r'ENDWHILE'
-    REPEAT = r'REPEAT'
-    UNTIL = r'UNTIL'
     READ = r'READ'
     WRITE = r'WRITE'
     PLUS = r'\+'
