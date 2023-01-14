@@ -36,6 +36,19 @@ class CompilerParser(Parser):
     def commands(self,p):
         return p.command
         
+    @_(' IF condition THEN commands ELSE commands ENDIF')
+    def command(self,p):
+        first_cond_not_fulfilled = self.get_label()
+        first_cond_fulfilled = self.get_label()
+        output = []
+
+        instructions_from_cond, jump_type = p.condition
+        jump_type += f" {first_cond_not_fulfilled}"
+        jump_outside_of_if = asm.jump() + first_cond_fulfilled
+    
+        output += instructions_from_cond + [jump_type]
+        return output + p.commands0 + [jump_outside_of_if] + [first_cond_not_fulfilled] + p.commands1 + [first_cond_fulfilled]
+        
     @_('IF condition THEN commands ENDIF')
     def command(self,p):
         endif_label = self.get_label()
