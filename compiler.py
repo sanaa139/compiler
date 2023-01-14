@@ -13,11 +13,11 @@ class CompilerParser(Parser):
         
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
-        main_output_instructions = p.declarations + p.commands + ["HALT"]
+        main_output_instructions = p.declarations + p.commands
         print(p.declarations)
         print(p.commands)
         print(main_output_instructions)
-        main_output_instructions = self.delete_labels(main_output_instructions)
+        main_output_instructions = self.delete_labels(main_output_instructions) + ["HALT"]
                 
         print(main_output_instructions)
         
@@ -43,8 +43,6 @@ class CompilerParser(Parser):
         output = []
 
         instructions_from_cond, jump_type = p.condition
-        #print("wrr")
-        #print(instructions_from_cond, " ", jump_type)
         jump_type += f" {endif_label}"
     
         output += instructions_from_cond + [jump_type]
@@ -77,6 +75,9 @@ class CompilerParser(Parser):
     
     @_('ID ASSIGN expression SEMICOLON')
     def command(self,p):
+        if p.ID not in self.p_cells:
+            raise Exception(f"Nie istnieje zmienna {p.ID}")
+        
         output = []
         
         if(p.expression[1] == "not_operation"):
@@ -145,8 +146,6 @@ class CompilerParser(Parser):
             output.append(asm.sub(self.p_cells[p.value1]))
         
         return (output, "operation")
-        
-        pass
     
     @_('NUM')
     def value(self, p):
@@ -154,7 +153,10 @@ class CompilerParser(Parser):
     
     @_('ID')
     def value(self, p):
-        return p.ID
+        if p.ID not in self.p_cells:
+            raise Exception(f"Nie istnieje zmienna {p.ID}")
+        else:
+            return p.ID
     
     @_('value EQ value')
     def condition(self, p):
@@ -338,10 +340,6 @@ class CompilerParser(Parser):
                 return ([], "!")
     
     
-    
-    
-    def writeToOutput(self, s):
-        self.output.append(s)
         
     def get_label(self):
         label = "E_" + str(self.label_id)
@@ -354,34 +352,25 @@ class CompilerParser(Parser):
         return index
     
     def delete_labels(self, instructions):
-        all_labels = []
-        indexes_to_delete = []
+        all_labels = {}
         indexOfInstructions = 0
-        
-        k = 0
-        for index, instruction in enumerate(instructions):
-            print(instruction, " ", index)
+        instructions_after_deletion = []
+      
+        for instruction in instructions:
             if instruction.startswith('E'):
-                all_labels.append((instruction, indexOfInstructions))
-                indexes_to_delete.append(index - k)
-                k += 1
+                all_labels[instruction] = indexOfInstructions
             else:
-                indexOfInstructions += 1
-                
-        for index in indexes_to_delete:
-            instructions.pop(index)
+                if not instruction.startswith("!"):
+                    instructions_after_deletion.append(instruction)
+                    indexOfInstructions += 1
+                    
+        for index, instruction in enumerate(instructions_after_deletion):
+                splitted_instruction = instruction.split()
+                first_word_instruction, second_word_instruction = splitted_instruction[0], splitted_instruction[1]
+                if second_word_instruction in all_labels:
+                    instructions_after_deletion[index] = first_word_instruction + f" {all_labels[second_word_instruction]}"
             
-        print(all_labels)
-        for index, instruction in enumerate(instructions):
-            for label in all_labels:
-                if instruction.endswith(label[0]):
-                    if instruction.startswith("!"):
-                        instructions.remove(instruction)
-                    else:
-                        first_word_instruction = instruction.split()[0]
-                        instructions[index] = first_word_instruction + " " + str(label[1])
-        
-        return instructions
+        return instructions_after_deletion
     
 if __name__ == '__main__':
     with open(sys.argv[1], 'r') as f:
