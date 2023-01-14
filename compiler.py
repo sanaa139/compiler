@@ -23,10 +23,14 @@ class CompilerParser(Parser):
         
         with open("./moje_wyniki/wyniki.mr", "w") as file:
             file.write("\n".join(main_output_instructions))
-        
+            
     @_('PROGRAM IS BEGIN commands END')
-    def main(self, p):   
-        pass
+    def main(self, p):
+        main_output_instructions = p.commands
+        main_output_instructions = self.delete_labels(main_output_instructions) + ["HALT"]
+                
+        with open("./moje_wyniki/wyniki.mr", "w") as file:
+            file.write("\n".join(main_output_instructions))
         
     @_('commands command')
     def commands(self,p):
@@ -74,6 +78,32 @@ class CompilerParser(Parser):
     
         output += instructions_from_cond + [jump_type]
         return output + p.commands  + [jump_to_while] + [endwhile_label]
+    
+    @_('REPEAT commands UNTIL condition SEMICOLON')
+    def command(self,p):
+        go_to_repeat_label = self.get_label()
+        output = []
+
+        instructions_from_cond, jump_type = p.condition
+        print("haaaaaaaaaaaaaa")
+        print(jump_type)
+        if jump_type.startswith("JUMP"):
+            jump_type = ""
+        elif jump_type == "!":
+            output.append(go_to_repeat_label)
+            jump_type = f"JUMP {go_to_repeat_label}"
+        elif jump_type.startswith("JPOS"):
+            output.append(go_to_repeat_label)
+            jump_type = f"JZERO {go_to_repeat_label}"
+        elif jump_type.startswith("JZERO"):
+            output.append(go_to_repeat_label)
+            jump_type = f"JPOS {go_to_repeat_label}"
+    
+        output += p.commands + instructions_from_cond
+        if jump_type != "":
+            output += [jump_type]
+        print(output)
+        return output
         
     @_('READ ID SEMICOLON')
     def command(self,p):
@@ -116,11 +146,15 @@ class CompilerParser(Parser):
     
     @_('declarations COMMA ID')
     def declarations(self,p):
+        if p.ID in self.p_cells:
+            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie w tym samym bloku: {p.ID}")
         self.p_cells[p.ID] = self.get_available_index()
         return []
     
     @_('ID')
     def declarations(self,p):
+        if p.ID in self.p_cells:
+            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie: {p.ID}")
         self.p_cells[p.ID] = self.get_available_index()
         return []
     
@@ -400,7 +434,7 @@ if __name__ == '__main__':
     print(data)
     lexer = CompilerLexer()
     parser = CompilerParser()
-    #print(list(lexer.tokenize(data)))
+    print(list(lexer.tokenize(data)))
     parser.parse(lexer.tokenize(data))
 
     print("P_cells:")

@@ -51,9 +51,9 @@ class CompilerLexer(Lexer):
     LEFT_PARENTHESIS = r'\('
     RIGHT_PARENTHESIS = r'\)'
 
-    ignore = r' \t'
+    ignore = ' \t'
         
-    ignore_comment = r'^\[.*\]'
+    ignore_comment = r'\[[^\]]*\]'
 
     ignore_new_lines = r'\n+'
     NUM = r'\d+'
