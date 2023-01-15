@@ -7,9 +7,10 @@ class DeclarationsParser(Parser):
     
     def __init__(self):
         self.p_cells = {}
-        self.proc_order = {}
+        self.proc_order = []
         self.number_of_var = 2
         self.proc_num = 0
+        
     
     @_('procedures main')
     def program_all(self, p):
@@ -25,7 +26,7 @@ class DeclarationsParser(Parser):
     
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
-        self.proc_order[p.proc_head[0]] = self.get_proc_order()
+        self.proc_order.append((p.proc_head[0], self.get_proc_order()))
         
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
@@ -39,7 +40,7 @@ class DeclarationsParser(Parser):
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
-        self.proc_order[p.proc_head[0]] = self.get_proc_order()
+        self.proc_order.append((p.proc_head[0], self.get_proc_order()))
         
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
@@ -54,7 +55,7 @@ class DeclarationsParser(Parser):
         
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
-        self.proc_order["main"] = self.get_proc_order()
+        self.proc_order.append(("main", self.get_proc_order()))
         
         for var in p.declarations:
             if ("main", var) in self.p_cells:
@@ -63,7 +64,7 @@ class DeclarationsParser(Parser):
             
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):
-        self.proc_order["main"] = self.get_proc_order()
+        self.proc_order.append(("main", self.get_proc_order()))
         
         
     @_('commands command')

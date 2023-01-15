@@ -1,16 +1,22 @@
 from sly import Parser
 from lex import CompilerLexer
+from dec import DeclarationsParser
 import sys
 from pprint import pprint
 import asm
 
-class CompilerParser(Parser):
+class CompilerParser(DeclarationsParser):
     tokens = CompilerLexer.tokens
-    p_cells = {}
     number_of_var = 2
     label_id = 0
     var_passed_to_proc = []
-    proc_names = []
+    proc_names = {}
+    current_proc = 0
+    
+    def __init__(self, p_cells, proc_order):
+        super().__init__()
+        self.p_cells = p_cells
+        self.proc_order = proc_order
     
     
     @_('procedures main')
@@ -32,31 +38,17 @@ class CompilerParser(Parser):
     
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
-        print("GRRRRRRRRRRRRRR")
-        print(p.proc_head[0], " ", p.proc_head[1])
+        self.current_proc += 1
         return []
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
-        """
-        if p.proc_head[0] not in self.p_cells:
-            self.p_cells[p.proc_head[0]] = self.get_available_index()
-
-        for var in p.proc_head[1]:
-            self.p_cells[p.proc_head[0] + "_$" + var] = self.p_cells[var]
-            del self.p_cells[var]
-            
-        for index, var in enumerate(p.proc_head[1]):
-            p.proc_head[1][index] = p.proc_head[0] + "_$" + var
-        """
-        
         self.proc_names.append(p.proc_head[0])
         output = ["E_" + p.proc_head[0]] + p.commands
     
+        self.current_proc += 1
         return output
 
-        
-    
     @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
     def proc_head(self, p):
         return (p.ID, p.declarations)
@@ -69,6 +61,7 @@ class CompilerParser(Parser):
         print(p.commands)
         print(main_output_instructions)
     
+        self.current_proc += 1
         return main_output_instructions
             
     @_('PROGRAM IS BEGIN commands END')
@@ -76,6 +69,7 @@ class CompilerParser(Parser):
         main_output_instructions = p.commands
         main_output_instructions = self.delete_labels(main_output_instructions) + ["HALT"]
                 
+        self.current_proc += 1
         return main_output_instructions
         
     @_('commands command')
@@ -151,26 +145,36 @@ class CompilerParser(Parser):
     @_('proc_head SEMICOLON')
     def command(self, p):
         label = self.get_available_index()
+        
+        output = []
+        for var in p.proc_head[1]:
+            output.append(asm.set(self.p_cells[var]))
+            #output.append(asm.store())
+        
         return [f"JUMP E_{p.proc_head[0]}", f"E_{label}"]
     
     @_('READ ID SEMICOLON')
     def command(self,p):
-        if p.ID in self.p_cells:
-            return [asm.get(self.p_cells[p.ID])]
-        else:
-            raise Exception(f"Nie istnieje zmienna {p.ID}")
+        cur_proc = self.get_current_proc_name()
+
+        if (cur_proc, p.ID) in self.p_cells:
+            print("KAKAK")
+            return [asm.get(self.p_cells[(cur_proc, p.ID)])]
     
     @_('WRITE value SEMICOLON')
     def command(self,p):
-        if p.value in self.p_cells:
+        cur_proc = ""
+        for proc in self.proc_order:
+            if proc[1] == self.current_proc:
+                cur_proc = proc
+        
+        if (cur_proc, p.value) in self.p_cells:
             return [f"PUT {self.p_cells[p.value]}"]
         elif type(p.value) == int:
             return [
                 asm.set(p.value),
                 asm.put(0)
             ]
-        else:
-            raise Exception("Nie istnieje zmienna " + str(p.value))
 
     
     @_('ID ASSIGN expression SEMICOLON')
@@ -194,17 +198,11 @@ class CompilerParser(Parser):
     
     @_('declarations COMMA ID')
     def declarations(self,p):
-        """if p.ID in self.p_cells:
-            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie w tym samym bloku: {p.ID}")"""
-        self.p_cells[p.ID] = self.get_available_index()
-        return p.declarations + [p.ID]
+        pass
     
     @_('ID')
     def declarations(self,p):
-        """if p.ID in self.p_cells:
-            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie: {p.ID}")"""
-        self.p_cells[p.ID] = self.get_available_index()
-        return [p.ID]
+        pass
     
     @_('value')
     def expression(self,p):
@@ -257,10 +255,7 @@ class CompilerParser(Parser):
     
     @_('ID')
     def value(self, p):
-        if p.ID not in self.p_cells:
-            raise Exception(f"Nie istnieje zmienna {p.ID}")
-        else:
-            return p.ID
+        return p.ID
     
     @_('value EQ value')
     def condition(self, p):
@@ -455,6 +450,12 @@ class CompilerParser(Parser):
         self.number_of_var += 1
         return index
     
+    def get_current_proc_name(self):
+        for proc in self.proc_order:
+            if proc[1] == self.current_proc:
+                cur_proc = proc[0]
+        return cur_proc
+    
     def delete_labels(self, instructions):
         all_labels = {}
         indexOfInstructions = 0
@@ -484,9 +485,13 @@ if __name__ == '__main__':
         data = f.read()
     print(data)
     lexer = CompilerLexer()
-    parser = CompilerParser()
+    dec = DeclarationsParser()
+    dec.parse(lexer.tokenize(data))
+    declared_variables = dec.p_cells
+    parser = CompilerParser(dec.p_cells, dec.proc_order)
     #print(list(lexer.tokenize(data)))
     parser.parse(lexer.tokenize(data))
 
     print("P_cells:")
     print(parser.p_cells)
+    
