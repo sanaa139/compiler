@@ -7,13 +7,44 @@ import asm
 class CompilerParser(Parser):
     tokens = CompilerLexer.tokens
     p_cells = {}
-    values_of_var = {}
     number_of_var = 2
     label_id = 0
+    var_passed_to_proc = []
+    
+    
+    @_('procedures main')
+    def program_all(self, p):
+        output = p.main
+        print(output)
+        with open("./moje_wyniki/wyniki.mr", "w") as file:
+            file.write("\n".join(output))
+    
+    @_('procedures procedure')
+    def procedures(self, p):
+        return [p.procedures] + p.procedure
+    
+    @_('')
+    def procedures(self, p):
+        return []
+    
+    @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
+    def procedure(self, p):
+        return []
+    
+    @_('PROCEDURE proc_head IS BEGIN commands END')
+    def procedure(self, p):
+        return []
+
+        
+    
+    @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
+    def proc_head(self, p):
+        return (p.ID, p.declarations)
+    
         
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
-        main_output_instructions = p.declarations + p.commands
+        main_output_instructions = p.commands
         print(p.declarations)
         print(p.commands)
         print(main_output_instructions)
@@ -21,16 +52,14 @@ class CompilerParser(Parser):
                 
         print(main_output_instructions)
         
-        with open("./moje_wyniki/wyniki.mr", "w") as file:
-            file.write("\n".join(main_output_instructions))
+        return main_output_instructions
             
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):
         main_output_instructions = p.commands
         main_output_instructions = self.delete_labels(main_output_instructions) + ["HALT"]
                 
-        with open("./moje_wyniki/wyniki.mr", "w") as file:
-            file.write("\n".join(main_output_instructions))
+        return main_output_instructions
         
     @_('commands command')
     def commands(self,p):
@@ -85,8 +114,6 @@ class CompilerParser(Parser):
         output = []
 
         instructions_from_cond, jump_type = p.condition
-        print("haaaaaaaaaaaaaa")
-        print(jump_type)
         if jump_type.startswith("JUMP"):
             jump_type = ""
         elif jump_type == "!":
@@ -102,7 +129,6 @@ class CompilerParser(Parser):
         output += p.commands + instructions_from_cond
         if jump_type != "":
             output += [jump_type]
-        print(output)
         return output
         
     @_('READ ID SEMICOLON')
@@ -149,14 +175,14 @@ class CompilerParser(Parser):
         if p.ID in self.p_cells:
             raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie w tym samym bloku: {p.ID}")
         self.p_cells[p.ID] = self.get_available_index()
-        return []
+        return p.declarations + [p.ID]
     
     @_('ID')
     def declarations(self,p):
         if p.ID in self.p_cells:
             raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie: {p.ID}")
         self.p_cells[p.ID] = self.get_available_index()
-        return []
+        return [p.ID]
     
     @_('value')
     def expression(self,p):
@@ -434,10 +460,8 @@ if __name__ == '__main__':
     print(data)
     lexer = CompilerLexer()
     parser = CompilerParser()
-    print(list(lexer.tokenize(data)))
+    #print(list(lexer.tokenize(data)))
     parser.parse(lexer.tokenize(data))
 
     print("P_cells:")
     print(parser.p_cells)
-    print("value of var:")
-    print(parser.values_of_var)
