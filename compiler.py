@@ -10,18 +10,21 @@ class CompilerParser(Parser):
     number_of_var = 2
     label_id = 0
     var_passed_to_proc = []
+    proc_names = []
     
     
     @_('procedures main')
     def program_all(self, p):
-        output = p.main
+        output = [f"JUMP E_main"] + p.procedures + p.main
+        output = self.delete_labels(output)
+        output += ["HALT"]
         print(output)
         with open("./moje_wyniki/wyniki.mr", "w") as file:
             file.write("\n".join(output))
     
     @_('procedures procedure')
     def procedures(self, p):
-        return [p.procedures] + p.procedure
+        return p.procedures + p.procedure
     
     @_('')
     def procedures(self, p):
@@ -29,11 +32,28 @@ class CompilerParser(Parser):
     
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
+        print("GRRRRRRRRRRRRRR")
+        print(p.proc_head[0], " ", p.proc_head[1])
         return []
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
-        return []
+        """
+        if p.proc_head[0] not in self.p_cells:
+            self.p_cells[p.proc_head[0]] = self.get_available_index()
+
+        for var in p.proc_head[1]:
+            self.p_cells[p.proc_head[0] + "_$" + var] = self.p_cells[var]
+            del self.p_cells[var]
+            
+        for index, var in enumerate(p.proc_head[1]):
+            p.proc_head[1][index] = p.proc_head[0] + "_$" + var
+        """
+        
+        self.proc_names.append(p.proc_head[0])
+        output = ["E_" + p.proc_head[0]] + p.commands
+    
+        return output
 
         
     
@@ -44,14 +64,11 @@ class CompilerParser(Parser):
         
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
-        main_output_instructions = p.commands
+        main_output_instructions = ["E_main"] + p.commands
         print(p.declarations)
         print(p.commands)
         print(main_output_instructions)
-        main_output_instructions = self.delete_labels(main_output_instructions) + ["HALT"]
-                
-        print(main_output_instructions)
-        
+    
         return main_output_instructions
             
     @_('PROGRAM IS BEGIN commands END')
@@ -131,6 +148,11 @@ class CompilerParser(Parser):
             output += [jump_type]
         return output
         
+    @_('proc_head SEMICOLON')
+    def command(self, p):
+        label = self.get_available_index()
+        return [f"JUMP E_{p.proc_head[0]}", f"E_{label}"]
+    
     @_('READ ID SEMICOLON')
     def command(self,p):
         if p.ID in self.p_cells:
@@ -172,15 +194,15 @@ class CompilerParser(Parser):
     
     @_('declarations COMMA ID')
     def declarations(self,p):
-        if p.ID in self.p_cells:
-            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie w tym samym bloku: {p.ID}")
+        """if p.ID in self.p_cells:
+            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie w tym samym bloku: {p.ID}")"""
         self.p_cells[p.ID] = self.get_available_index()
         return p.declarations + [p.ID]
     
     @_('ID')
     def declarations(self,p):
-        if p.ID in self.p_cells:
-            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie: {p.ID}")
+        """if p.ID in self.p_cells:
+            raise Exception(f"Znaleziono wiecej niz jedna zmienna o tej samej nazwie: {p.ID}")"""
         self.p_cells[p.ID] = self.get_available_index()
         return [p.ID]
     
@@ -445,11 +467,14 @@ class CompilerParser(Parser):
                 if not instruction.startswith("!"):
                     instructions_after_deletion.append(instruction)
                     indexOfInstructions += 1
-                    
+                   
+        print(all_labels) 
+        print("AAAAAAAAAA")
         for index, instruction in enumerate(instructions_after_deletion):
                 splitted_instruction = instruction.split()
                 first_word_instruction, second_word_instruction = splitted_instruction[0], splitted_instruction[1]
                 if second_word_instruction in all_labels:
+                    print(second_word_instruction)
                     instructions_after_deletion[index] = first_word_instruction + f" {all_labels[second_word_instruction]}"
             
         return instructions_after_deletion
