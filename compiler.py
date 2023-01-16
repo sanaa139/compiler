@@ -10,19 +10,19 @@ class CompilerParser(DeclarationsParser):
     tokens = CompilerLexer.tokens
     number_of_var = 2
     label_id = 0
-    var_passed_to_proc = []
     current_proc = 0
-    procedure_call = None
     
     def __init__(self, p_cells, proc_order):
         super().__init__()
         self.p_cells = p_cells
         self.proc_order = proc_order
+        self.var_passed_to_proc = []
     
     
     @_('procedures main')
     def program_all(self, p):
         output = [f"JUMP E_main"] + p.procedures + p.main
+        print(output)
         output = self.delete_labels(output)
         output += ["HALT"]
         print(output)
@@ -39,18 +39,15 @@ class CompilerParser(DeclarationsParser):
     
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
-        print("Commands in procedure:")
-        print(p.commands)
         output = ["E_" + p.proc_head[0]] + p.commands
         self.current_proc += 1
         return output
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
-        print("Commands in procedure:")
-        print(p.commands)
-        output = ["E_" + p.proc_head[0]] + p.commands
-    
+        index = self.get("$ret", p.proc_head[0]).id_num
+        output = ["E_" + p.proc_head[0]] + p.commands + [f"JUMPI {index}"]
+        
         self.current_proc += 1
         return output
 
@@ -154,13 +151,17 @@ class CompilerParser(DeclarationsParser):
         output = []
         variables_from_proc = [item[1] for item in self.p_cells if item[0] == p.proc_head[0]]
         for var_main, var_proc in zip(p.proc_head[1], variables_from_proc):
-            print(var_main, " ", var_proc)
             output.append(asm.set(self.get(var_main).id_num))
-            self.procedure_call = p.proc_head[0]
-            output.append(asm.store(self.get(var_proc).id_num))
-            self.get(var_proc).is_initialized = True
-            self.procedure_call = None
+            output.append(asm.store(self.get(var_proc, p.proc_head[0]).id_num))
+            if self.get(var_main).is_initialized is True:
+                self.get(var_proc, p.proc_head[0]).is_initialized = True
         
+        output.append(asm.set(f"E_{label}"))
+        output.append(asm.store(self.get("$ret", p.proc_head[0]).id_num))
+        
+        for var in p.proc_head[1]:
+            self.get(var).is_initialized = True
+
         return output + [f"JUMP E_{p.proc_head[0]}", f"E_{label}"]
     
     @_('READ ID SEMICOLON')
@@ -170,7 +171,9 @@ class CompilerParser(DeclarationsParser):
             return [asm.get(self.get(p.ID).id_num)]
     
     @_('WRITE value SEMICOLON')
-    def command(self,p):        
+    def command(self,p):       
+        print("CURRENT PROC") 
+        print(self.current_proc)
         if self.get(p.value):
             if not self.get(p.value).is_initialized:
                 raise Exception(f"Zmienna {p.value} nie została zainicjalizowana")
@@ -191,11 +194,15 @@ class CompilerParser(DeclarationsParser):
             if(type(p.expression[0]) == int):
                 output.append(asm.set(p.expression[0]))
                 output.append(self.GEN_STORE(p.ID))
+                self.get(p.ID).is_initialized = True
             else:
                 output.append(self.GEN_LOAD((p.expression[0])))
                 output.append(self.GEN_STORE(p.ID))
+                self.get(p.ID).is_initialized = True
         else:
             output += p.expression[0] + [self.GEN_STORE(p.ID)]
+            self.get(p.ID).is_initialized = True
+           
             
         return output
     
@@ -218,12 +225,16 @@ class CompilerParser(DeclarationsParser):
         if type(p.value0) == int and type(p.value1) == int:
             return (p.value0 + p.value1, "not_operation")
         elif type(p.value0) == str and type(p.value1) == int:
+            self.check_if_initialized(p.value0)
             output.append(asm.set(p.value1))
             output.append(self.GEN_ADD((p.value0)))
         elif type(p.value0) == int and type(p.value1) == str:
+            self.check_if_initialized(p.value1)
             output.append(asm.set(p.value0))
             output.append(self.GEN_ADD((p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
+            self.check_if_initialized(p.value0)
+            self.check_if_initialized(p.value1)
             output.append(self.GEN_LOAD((p.value0)))
             output.append(self.GEN_ADD((p.value1)))
         
@@ -454,16 +465,22 @@ class CompilerParser(DeclarationsParser):
         self.number_of_var += 1
         return index
     
-    def get(self, name):
-        print("JESTEM W GET")
+    def get(self, name, procedure = None):
         cur_proc = self.get_current_proc_name()
         got = self.p_cells.get((cur_proc, name))
         
-        if self.procedure_call is not None:
-            got = self.p_cells.get((self.procedure_call, name))
+        if procedure is not None:
+            got = self.p_cells.get((procedure, name))
         elif got is None and type(name) == str:
             raise Exception(f"Nie zadeklarowana zmienna {name}")
         return got
+    
+    def check_if_initialized(self, name):
+        cur_proc = self.get_current_proc_name()
+        got = self.p_cells.get((cur_proc, name))
+        
+        if got.is_initialized is False:
+            raise Exception(f"Zmienna {name} nie została zainicjalizowana")
         
     def get_current_proc_name(self):
         for proc in self.proc_order:
