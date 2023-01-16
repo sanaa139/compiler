@@ -148,28 +148,22 @@ class CompilerParser(DeclarationsParser):
         
         output = []
         for var in p.proc_head[1]:
-            output.append(asm.set(self.p_cells[var]))
+            output.append(asm.set(self.get(var)))
             #output.append(asm.store())
         
         return [f"JUMP E_{p.proc_head[0]}", f"E_{label}"]
     
     @_('READ ID SEMICOLON')
     def command(self,p):
-        cur_proc = self.get_current_proc_name()
-
-        if (cur_proc, p.ID) in self.p_cells:
-            print("KAKAK")
-            return [asm.get(self.p_cells[(cur_proc, p.ID)])]
+        if self.get(p.ID):
+            print("COOOO")
+            return [asm.get(self.get(p.ID))]
     
     @_('WRITE value SEMICOLON')
-    def command(self,p):
-        cur_proc = ""
-        for proc in self.proc_order:
-            if proc[1] == self.current_proc:
-                cur_proc = proc
-        
-        if (cur_proc, p.value) in self.p_cells:
-            return [f"PUT {self.p_cells[p.value]}"]
+    def command(self,p):        
+        if self.get(p.value):
+            output = asm.put(self.get(p.value))
+            return [f"{output}"]
         elif type(p.value) == int:
             return [
                 asm.set(p.value),
@@ -179,20 +173,17 @@ class CompilerParser(DeclarationsParser):
     
     @_('ID ASSIGN expression SEMICOLON')
     def command(self,p):
-        if p.ID not in self.p_cells:
-            raise Exception(f"Nie istnieje zmienna {p.ID}")
-        
         output = []
         
         if(p.expression[1] == "not_operation"):
             if(type(p.expression[0]) == int):
                 output.append(asm.set(p.expression[0]))
-                output.append(asm.store(self.p_cells[p.ID]))
+                output.append(asm.store(self.get(p.ID)))
             else:
-                output.append(asm.load(self.p_cells[p.expression[0]]))
-                output.append(asm.store(self.p_cells[p.ID]))
+                output.append(asm.load(self.get(p.expression[0])))
+                output.append(asm.store(self.get(p.ID)))
         else:
-            output += p.expression[0] + [asm.store(self.p_cells[p.ID])]
+            output += p.expression[0] + [asm.store(self.get(p.ID))]
             
         return output
     
@@ -216,13 +207,13 @@ class CompilerParser(DeclarationsParser):
             return (p.value0 + p.value1, "not_operation")
         elif type(p.value0) == str and type(p.value1) == int:
             output.append(asm.set(p.value1))
-            output.append(asm.add(self.p_cells[p.value0]))
+            output.append(asm.add(self.get(p.value0)))
         elif type(p.value0) == int and type(p.value1) == str:
             output.append(asm.set(p.value0))
-            output.append(asm.add(self.p_cells[p.value1]))
+            output.append(asm.add(self.get(p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
-            output.append(asm.load(self.p_cells[p.value0]))
-            output.append(asm.add(self.p_cells[p.value1]))
+            output.append(asm.load(self.get(p.value0)))
+            output.append(asm.add(self.get(p.value1)))
         
         return (output, "operation")
     
@@ -238,14 +229,14 @@ class CompilerParser(DeclarationsParser):
         elif type(p.value0) == str and type(p.value1) == int:
             output.append(asm.set(p.value1))
             output.append(asm.store(1))
-            output.append(asm.load(self.p_cells[p.value0]))
+            output.append(asm.load(self.get(p.value0)))
             output.append(asm.sub(1))
         elif type(p.value0) == int and type(p.value1) == str:
             output.append(asm.set(p.value0))
-            output.append(asm.sub(self.p_cells[p.value1]))
+            output.append(asm.sub(self.get(p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
-            output.append(asm.load(self.p_cells[p.value0]))
-            output.append(asm.sub(self.p_cells[p.value1]))
+            output.append(asm.load(self.get(p.value0)))
+            output.append(asm.sub(self.get(p.value1)))
         
         return (output, "operation")
     
@@ -258,36 +249,36 @@ class CompilerParser(DeclarationsParser):
         return p.ID
     
     @_('value EQ value')
-    def condition(self, p):
+    def condition(self, p):    
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.p_cells[p.value0]),
-                asm.sub(self.p_cells[p.value1]),
+                asm.load(self.get(p.value0)),
+                asm.sub(self.get(p.value1)),
                 asm.store(1),
-                asm.load(self.p_cells[p.value1]),
-                asm.sub(self.p_cells[p.value0]),
+                asm.load(self.get(p.value1)),
+                asm.sub(self.get(p.value0)),
                 asm.add(1)
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.p_cells[p.value0]),
+                asm.load(self.get(p.value0)),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value1),
-                asm.sub(self.p_cells[p.value0]),
+                asm.sub(self.get(p.value0)),
                 asm.add(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.p_cells[p.value1]),
+                asm.load(self.get(p.value1)),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value0),
-                asm.sub(self.p_cells[p.value1]),
+                asm.sub(self.get(p.value1)),
                 asm.add(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -297,36 +288,36 @@ class CompilerParser(DeclarationsParser):
                 return ([], "!")
 
     @_('value NEQ value')
-    def condition(self, p):
+    def condition(self, p):    
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.p_cells[p.value0]),
-                asm.sub(self.p_cells[p.value1]),
+                asm.load(self.get(p.value0)),
+                asm.sub(self.get(p.value1)),
                 asm.store(1),
-                asm.load(self.p_cells[p.value1]),
-                asm.sub(self.p_cells[p.value0]),
+                asm.load(self.get(p.value1)),
+                asm.sub(self.get(p.value0)),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.p_cells[p.value0]),
+                asm.load(self.get(p.value0)),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value1),
-                asm.sub(self.p_cells[p.value0]),
+                asm.sub(self.get(p.value0)),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.p_cells[p.value1]),
+                asm.load(self.get(p.value1)),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value0),
-                asm.sub(self.p_cells[p.value1]),
+                asm.sub(self.get(p.value1)),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -336,24 +327,24 @@ class CompilerParser(DeclarationsParser):
                 return ([], "!")
 
     @_('value GREATER_THAN value')
-    def condition(self, p):
+    def condition(self, p):    
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.p_cells[p.value0]), 
-                asm.sub(self.p_cells[p.value1]),
+                asm.load(self.get(p.value0)), 
+                asm.sub(self.get(p.value1)),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.p_cells[p.value0]),
+                asm.load(self.get(p.value0)),
                 asm.sub(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                asm.set(self.p_cells[p.value1]), 
+                asm.set(self.get(p.value1)), 
                 asm.store(1),
-                asm.set(self.p_cells[p.value0]),
+                asm.set(self.get(p.value0)),
                 asm.sub(1)
             ], asm.jzero())
         else:
@@ -364,22 +355,22 @@ class CompilerParser(DeclarationsParser):
             
         
     @_('value LESS_THAN value')
-    def condition(self, p):
+    def condition(self, p):     
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.p_cells[p.value1]), 
-                asm.sub(self.p_cells[p.value0]),
+                asm.load(self.get(p.value1)), 
+                asm.sub(self.get(p.value0)),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1), 
-                asm.sub(self.p_cells[p.value0])
+                asm.sub(self.get(p.value0))
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                asm.set(self.p_cells[p.value0]), 
+                asm.set(self.get(p.value0)), 
                 asm.store(1), 
-                asm.load(self.p_cells[p.value1]),
+                asm.load(self.get(p.value1)),
                 asm.sub(1)
             ], asm.load())
         else:
@@ -389,22 +380,22 @@ class CompilerParser(DeclarationsParser):
                 return ([], "!")
 
     @_('value GREATER_THAN_OR_EQUAL value')
-    def condition(self, p):
+    def condition(self, p):        
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.p_cells[p.value1]),
-                asm.sub(self.p_cells[p.value0])
+                asm.load(self.get(p.value1)),
+                asm.sub(self.get(p.value0))
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
-                asm.sub(self.p_cells[p.value0])
+                asm.sub(self.get(p.value0))
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.p_cells[p.value1]),
+                asm.load(self.get(p.value1)),
                 asm.sub(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -417,20 +408,20 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.p_cells[p.value0]),
-                asm.sub(self.p_cells[p.value1])
+                asm.load(self.get(p.value0)),
+                asm.sub(self.get(p.value1))
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.p_cells[p.value0]),
+                asm.load(self.get(p.value0)),
                 asm.sub(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
-                asm.sub(self.p_cells[p.value1])
+                asm.sub(self.get(p.value1))
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
             if not(p.value0 <= p.value1):
@@ -449,6 +440,15 @@ class CompilerParser(DeclarationsParser):
         index = self.number_of_var
         self.number_of_var += 1
         return index
+    
+    def get(self, name):
+        cur_proc = self.get_current_proc_name()
+    
+        got = self.p_cells.get((cur_proc, name))
+        if got is None:
+            raise Exception(f"Nie zadeklarowana zmienna {name}")
+        return got
+        
     
     def get_current_proc_name(self):
         for proc in self.proc_order:
