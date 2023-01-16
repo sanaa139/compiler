@@ -185,7 +185,7 @@ class CompilerParser(DeclarationsParser):
                 output.append(asm.set(p.expression[0]))
                 output.append(asm.store(self.get(p.ID).id_num))
             else:
-                output.append(asm.load(self.get(p.expression[0])))
+                output.append(self.GEN_LOAD((p.expression[0])))
                 output.append(asm.store(self.get(p.ID).id_num))
         else:
             output += p.expression[0] + [asm.store(self.get(p.ID).id_num)]
@@ -212,25 +212,13 @@ class CompilerParser(DeclarationsParser):
             return (p.value0 + p.value1, "not_operation")
         elif type(p.value0) == str and type(p.value1) == int:
             output.append(asm.set(p.value1))
-            if self.get(p.value0).is_param:
-                output.append(asm.addi(self.get(p.value0).id_num))
-            else:
-                output.append(asm.add(self.get(p.value0).id_num))
+            output.append(self.GEN_ADD((p.value0)))
         elif type(p.value0) == int and type(p.value1) == str:
             output.append(asm.set(p.value0))
-            if self.get(p.value1).is_param:
-                output.append(asm.addi(self.get(p.value1).id_num))
-            else:
-                output.append(asm.add(self.get(p.value1).id_num))
+            output.append(self.GEN_ADD((p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
-            if self.get(p.value0).is_param:
-                output.append(asm.loadi(self.get(p.value0)))
-            else:
-                output.append(asm.load(self.get(p.value0)))
-            if self.get(p.value1).is_param:
-                output.append(asm.addi(self.get(p.value1).id_num))
-            else:
-                output.append(asm.add(self.get(p.value1).id_num))
+            output.append(self.GEN_LOAD(self.get(p.value0)))
+            output.append(self.GEN_ADD((p.value1)))
         
         return (output, "operation")
     
@@ -246,26 +234,15 @@ class CompilerParser(DeclarationsParser):
         elif type(p.value0) == str and type(p.value1) == int:
             output.append(asm.set(p.value1))
             output.append(asm.store(1))
-            if self.get(p.value0).is_param:
-                output.append(asm.loadi(self.get(p.value0).id_num))
-            else:
-                output.append(asm.load(self.get(p.value0).id_num))
+            output.append(self.GEN_LOAD((p.value0)))
             output.append(asm.sub(1))
         elif type(p.value0) == int and type(p.value1) == str:
             output.append(asm.set(p.value0))
-            if self.get(p.value1).is_param:
-                output.append(asm.subi(self.get(p.value1).id_num))
-            else:
-                output.append(asm.sub(self.get(p.value1).id_num))
+            output.append(self.GEN_SUB((p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
-            if self.get(p.value0).is_param:
-                output.append(asm.loadi(self.get(p.value0).id_num))
-            else:
-                output.append(asm.load(self.get(p.value0).id_num))
-            if self.get(p.value1).is_param:
-                output.append(asm.subi(self.get(p.value1).id_num))
-            else:
-                output.append(asm.sub(self.get(p.value1).id_num))
+            output.append(self.GEN_LOAD((p.value0)))
+            output.append(self.GEN_SUB((p.value1)))
+         
         
         return (output, "operation")
     
@@ -279,63 +256,35 @@ class CompilerParser(DeclarationsParser):
     
     @_('value EQ value')
     def condition(self, p):
-        output = []
         if(type(p.value0) == str and type(p.value1) == str):
-        
-            if self.get(p.value0).is_param:
-                output.append(asm.loadi(self.get(p.value0).id_num))
-            else:  
-                output.append(asm.load(self.get(p.value0).id_num))
-                
-            if self.get(p.value1).is_param:
-                output.append(asm.subi(self.get(p.value1).id_num))
-            else:   
-                output.append(asm.sub(self.get(p.value1).id_num))
-                
-            output.append(asm.store(1))
-            
-            if self.get(p.value1).is_param:
-                output.append(asm.loadi(self.get(p.value1).id_num))
-            else:
-                output.append(asm.load(self.get(p.value1).id_num))
-                
-            if self.get(p.value0).is_param:
-                output.append(asm.subi(self.get(p.value0).id_num))
-            else:
-                output.append(asm.sub(self.get(p.value0).id_num))
-            
-            output.append(asm.add(1))
-    
-            return (output, asm.jpos())
+            return ([
+                self.GEN_LOAD((p.value0)), 
+                self.GEN_SUB((p.value1)),
+                asm.store(1),
+                self.GEN_LOAD((p.value1)),
+                self.GEN_SUB((p.value0)),
+                asm.add(1)
+            ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
-            output.append(asm.set(p.value1))
-            output.append(asm.store(1))
-            
-            if self.get(p.value0).is_param:
-                output.append(asm.loadi(self.get(p.value0).id_num))
-            else:
-                output.append(asm.load(self.get(p.value0).id_num))
-                
-            output.append(asm.sub(1))
-            output.append(asm.store(1))
-            output.append(asm.set(p.value1))
-            
-            if self.get(p.value0).is_param:
-                output.append(asm.subi(self.get(p.value0).id_num))
-            else:
-                output.append(asm.sub(self.get(p.value0).id_num))
-            output.append(asm.add(1))
-            
-            return (output, asm.jpos())
+            return ([
+                asm.set(p.value1),
+                asm.store(1),
+                self.GEN_LOAD((p.value0)),    
+                asm.sub(1),
+                asm.store(1),
+                asm.set(p.value1),
+                self.GEN_SUB((p.value0)),
+                asm.add(1)
+            ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.get(p.value1).id_num),
+                self.GEN_LOAD((p.value1)),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value0),
-                asm.sub(self.get(p.value1).id_num),
+                self.GEN_SUB((p.value1)),
                 asm.add(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -345,36 +294,36 @@ class CompilerParser(DeclarationsParser):
                 return ([], "!")
 
     @_('value NEQ value')
-    def condition(self, p):    
+    def condition(self, p):  
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value0).id_num),
-                asm.sub(self.get(p.value1).id_num),
+                self.GEN_LOAD((p.value0)),
+                self.GEN_SUB((p.value1)),                
                 asm.store(1),
-                asm.load(self.get(p.value1).id_num),
-                asm.sub(self.get(p.value0).id_num),
+                self.GEN_LOAD((p.value1)),
+                self.GEN_SUB((p.value0)),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.get(p.value0).id_num),
+                self.GEN_LOAD((p.value0)),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value1),
-                asm.sub(self.get(p.value0).id_num),
+                self.GEN_SUB((p.value0)),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.get(p.value1).id_num),
+                self.GEN_LOAD((p.value1)),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value0),
-                asm.sub(self.get(p.value1).id_num),
+                self.GEN_SUB((p.value1)),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -387,21 +336,21 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):    
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value0).id_num), 
-                asm.sub(self.get(p.value1).id_num),
+                self.GEN_LOAD((p.value0)), 
+                self.GEN_SUB((p.value1)),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.get(p.value0).id_num),
+                self.GEN_LOAD((p.value0)),
                 asm.sub(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                asm.set(self.get(p.value1).id_num), 
+                asm.set((p.value1).id_num), 
                 asm.store(1),
-                asm.set(self.get(p.value0).id_num),
+                asm.set((p.value0).id_num),
                 asm.sub(1)
             ], asm.jzero())
         else:
@@ -415,19 +364,19 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):     
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value1).id_num), 
-                asm.sub(self.get(p.value0).id_num),
+                self.GEN_LOAD((p.value1)), 
+                self.GEN_SUB((p.value0)),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1), 
-                asm.sub(self.get(p.value0).id_num)
+                self.GEN_SUB((p.value0))
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                asm.set(self.get(p.value0).id_num), 
+                asm.set((p.value0).id_num), 
                 asm.store(1), 
-                asm.load(self.get(p.value1).id_num),
+                self.GEN_LOAD((p.value1)),
                 asm.sub(1)
             ], asm.load())
         else:
@@ -440,19 +389,19 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):        
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value1).id_num),
-                asm.sub(self.get(p.value0).id_num)
+                self.GEN_LOAD((p.value1)),
+                self.GEN_SUB((p.value0))
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
-                asm.sub(self.get(p.value0).id_num)
+                self.GEN_SUB((p.value0))
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.get(p.value1).id_num),
+                self.GEN_LOAD((p.value1)),
                 asm.sub(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -465,20 +414,20 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value0).id_num),
-                asm.sub(self.get(p.value1).id_num)
+                self.GEN_LOAD((p.value0)),
+                self.GEN_SUB((p.value1))
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.get(p.value0).id_num),
+                self.GEN_LOAD((p.value0)),
                 asm.sub(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
-                asm.sub(self.get(p.value1).id_num)
+                self.GEN_SUB((p.value1))
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
             if not(p.value0 <= p.value1):
@@ -502,7 +451,9 @@ class CompilerParser(DeclarationsParser):
         cur_proc = self.get_current_proc_name()
     
         got = self.p_cells.get((cur_proc, name))
-        if got is None:
+        print("HIPOHIPO")
+        print(got)
+        if got is None and type(name) == str:
             raise Exception(f"Nie zadeklarowana zmienna {name}")
         return got
         
@@ -511,6 +462,27 @@ class CompilerParser(DeclarationsParser):
             if proc[1] == self.current_proc:
                 cur_proc = proc[0]
         return cur_proc
+    
+    def GEN_SUB(self, var):
+        if self.get(var).is_param:
+            return asm.subi(self.get(var).id_num)
+        else:
+            return asm.sub(self.get(var).id_num)
+        
+    def GEN_ADD(self, var):
+        if self.get(var).is_param:
+            return asm.addi(self.get(var).id_num)
+        else:
+            return asm.add(self.get(var).id_num)
+        
+    def GEN_LOAD(self, var):
+        print("LOAD")
+     
+        if self.get(var).is_param:
+            return asm.loadi(self.get(var).id_num)
+        else:
+            return asm.load(self.get(var).id_num)
+
     
     def delete_labels(self, instructions):
         all_labels = {}
