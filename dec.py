@@ -2,6 +2,14 @@ from sly import Parser
 from lex import CompilerLexer
 import sys
 
+class VariableData():
+    def __init__(self, id_num, is_param, is_initialized):
+        self.id_num = id_num
+        self.is_param = is_param
+        self.is_initialized = is_initialized
+    def  __repr__(self):
+        return  f"Var({self.id_num}, {self.is_param}, {self.is_initialized})"
+
 class DeclarationsParser(Parser):
     tokens = CompilerLexer.tokens
     
@@ -31,11 +39,11 @@ class DeclarationsParser(Parser):
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = self.get_available_index()
+            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False)
         for var in p.declarations:
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = self.get_available_index()
+            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), False, False)
         return ''
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
@@ -45,7 +53,7 @@ class DeclarationsParser(Parser):
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = self.get_available_index()
+            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False)
         pass
 
     @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
@@ -60,7 +68,10 @@ class DeclarationsParser(Parser):
         for var in p.declarations:
             if ("main", var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[("main", var)] = self.get_available_index()
+            self.p_cells[("main", var)] = VariableData(self.get_available_index(), False, False)
+            print(("main", var))
+            print(self.p_cells[("main", var)].id_num)
+            print(self.p_cells[("main", var)].is_param)
             
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):
