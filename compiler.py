@@ -12,6 +12,7 @@ class CompilerParser(DeclarationsParser):
     label_id = 0
     var_passed_to_proc = []
     current_proc = 0
+    procedure_call = None
     
     def __init__(self, p_cells, proc_order):
         super().__init__()
@@ -38,12 +39,16 @@ class CompilerParser(DeclarationsParser):
     
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
+        print("Commands in procedure:")
+        print(p.commands)
         output = ["E_" + p.proc_head[0]] + p.commands
         self.current_proc += 1
         return output
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
+        print("Commands in procedure:")
+        print(p.commands)
         output = ["E_" + p.proc_head[0]] + p.commands
     
         self.current_proc += 1
@@ -80,7 +85,7 @@ class CompilerParser(DeclarationsParser):
     def commands(self,p):
         return p.command
         
-    @_(' IF condition THEN commands ELSE commands ENDIF')
+    @_('IF condition THEN commands ELSE commands ENDIF')
     def command(self,p):
         first_cond_not_fulfilled = self.get_label()
         first_cond_fulfilled = self.get_label()
@@ -144,15 +149,17 @@ class CompilerParser(DeclarationsParser):
         
     @_('proc_head SEMICOLON')
     def command(self, p):
-        print("UUUAAA")
-        print(p.proc_head)
         label = self.get_available_index()
         
         output = []
         variables_from_proc = [item[1] for item in self.p_cells if item[0] == p.proc_head[0]]
         for var_main, var_proc in zip(p.proc_head[1], variables_from_proc):
-            output.append(asm.set(self.get(var_main)))
-            output.append(asm.store(self.p_cells[(p.proc_head[0], var_proc)]))
+            print(var_main, " ", var_proc)
+            output.append(asm.set(self.get(var_main).id_num))
+            self.procedure_call = p.proc_head[0]
+            output.append(asm.store(self.get(var_proc).id_num))
+            self.get(var_proc).is_initialized = True
+            self.procedure_call = None
         
         return output + [f"JUMP E_{p.proc_head[0]}", f"E_{label}"]
     
@@ -183,12 +190,12 @@ class CompilerParser(DeclarationsParser):
         if(p.expression[1] == "not_operation"):
             if(type(p.expression[0]) == int):
                 output.append(asm.set(p.expression[0]))
-                output.append(asm.store(self.get(p.ID).id_num))
+                output.append(self.GEN_STORE(p.ID))
             else:
                 output.append(self.GEN_LOAD((p.expression[0])))
-                output.append(asm.store(self.get(p.ID).id_num))
+                output.append(self.GEN_STORE(p.ID))
         else:
-            output += p.expression[0] + [asm.store(self.get(p.ID).id_num)]
+            output += p.expression[0] + [self.GEN_STORE(p.ID)]
             
         return output
     
@@ -217,7 +224,7 @@ class CompilerParser(DeclarationsParser):
             output.append(asm.set(p.value0))
             output.append(self.GEN_ADD((p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
-            output.append(self.GEN_LOAD(self.get(p.value0)))
+            output.append(self.GEN_LOAD((p.value0)))
             output.append(self.GEN_ADD((p.value1)))
         
         return (output, "operation")
@@ -436,7 +443,7 @@ class CompilerParser(DeclarationsParser):
                 return ([], "!")
     
     
-        
+    
     def get_label(self):
         label = "E_" + str(self.label_id)
         self.label_id += 1
@@ -448,12 +455,13 @@ class CompilerParser(DeclarationsParser):
         return index
     
     def get(self, name):
+        print("JESTEM W GET")
         cur_proc = self.get_current_proc_name()
-    
         got = self.p_cells.get((cur_proc, name))
-        print("HIPOHIPO")
-        print(got)
-        if got is None and type(name) == str:
+        
+        if self.procedure_call is not None:
+            got = self.p_cells.get((self.procedure_call, name))
+        elif got is None and type(name) == str:
             raise Exception(f"Nie zadeklarowana zmienna {name}")
         return got
         
@@ -476,12 +484,16 @@ class CompilerParser(DeclarationsParser):
             return asm.add(self.get(var).id_num)
         
     def GEN_LOAD(self, var):
-        print("LOAD")
-     
         if self.get(var).is_param:
             return asm.loadi(self.get(var).id_num)
         else:
             return asm.load(self.get(var).id_num)
+        
+    def GEN_STORE(self, var):
+        if self.get(var).is_param:
+            return asm.storei(self.get(var).id_num)
+        else:
+            return asm.store(self.get(var).id_num)
 
     
     def delete_labels(self, instructions):
@@ -498,7 +510,6 @@ class CompilerParser(DeclarationsParser):
                     indexOfInstructions += 1
                    
         print(all_labels) 
-        print("AAAAAAAAAA")
         for index, instruction in enumerate(instructions_after_deletion):
                 splitted_instruction = instruction.split()
                 first_word_instruction, second_word_instruction = splitted_instruction[0], splitted_instruction[1]

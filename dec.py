@@ -56,6 +56,8 @@ class DeclarationsParser(Parser):
 
     @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
     def proc_head(self, p):
+        print("X")
+        print (p.ID, p.declarations)
         return (p.ID, p.declarations)
     
         
@@ -185,5 +187,6 @@ if __name__ == '__main__':
     lexer = CompilerLexer()
     parser = DeclarationsParser()
     parser.parse(lexer.tokenize(data))
+    print(list(lexer.tokenize(data)))
     print(parser.p_cells)
     print(parser.proc_order)

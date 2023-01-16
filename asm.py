@@ -36,3 +36,6 @@ def jump():
 
 def store(num: int):
     return f"STORE {num}"
+
+def storei(num: int):
+    return f"STOREI {num}"
