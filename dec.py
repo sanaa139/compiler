@@ -44,7 +44,6 @@ class DeclarationsParser(Parser):
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
             self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), False, False)
-        return ''
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
@@ -54,7 +53,6 @@ class DeclarationsParser(Parser):
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
             self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False)
-        pass
 
     @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
     def proc_head(self, p):

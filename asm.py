@@ -10,11 +10,20 @@ def put(num: int):
 def load(num: int):
     return f"LOAD {num}"
 
+def loadi(num: int):
+    return f"LOADI {num}"
+
 def sub(num: int):
     return f"SUB {num}"
 
+def subi(num: int):
+    return f"SUBI {num}"
+
 def add(num: int):
     return f"ADD {num}"
+
+def addi(num: int):
+    return f"ADDI {num}"
 
 def jzero():
     return f"JZERO "

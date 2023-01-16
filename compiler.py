@@ -1,6 +1,7 @@
 from sly import Parser
 from lex import CompilerLexer
 from dec import DeclarationsParser
+from dec import VariableData
 import sys
 from pprint import pprint
 import asm
@@ -10,7 +11,6 @@ class CompilerParser(DeclarationsParser):
     number_of_var = 2
     label_id = 0
     var_passed_to_proc = []
-    proc_names = {}
     current_proc = 0
     
     def __init__(self, p_cells, proc_order):
@@ -38,12 +38,12 @@ class CompilerParser(DeclarationsParser):
     
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
+        output = ["E_" + p.proc_head[0]] + p.commands
         self.current_proc += 1
-        return []
+        return output
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
-        self.proc_names.append(p.proc_head[0])
         output = ["E_" + p.proc_head[0]] + p.commands
     
         self.current_proc += 1
@@ -144,25 +144,30 @@ class CompilerParser(DeclarationsParser):
         
     @_('proc_head SEMICOLON')
     def command(self, p):
+        print("UUUAAA")
+        print(p.proc_head)
         label = self.get_available_index()
         
         output = []
-        for var in p.proc_head[1]:
-            output.append(asm.set(self.get(var)))
-            #output.append(asm.store())
+        variables_from_proc = [item[1] for item in self.p_cells if item[0] == p.proc_head[0]]
+        for var_main, var_proc in zip(p.proc_head[1], variables_from_proc):
+            output.append(asm.set(self.get(var_main)))
+            output.append(asm.store(self.p_cells[(p.proc_head[0], var_proc)]))
         
-        return [f"JUMP E_{p.proc_head[0]}", f"E_{label}"]
+        return output + [f"JUMP E_{p.proc_head[0]}", f"E_{label}"]
     
     @_('READ ID SEMICOLON')
     def command(self,p):
         if self.get(p.ID):
-            print("COOOO")
-            return [asm.get(self.get(p.ID))]
+            self.get(p.ID).is_initialized = True
+            return [asm.get(self.get(p.ID).id_num)]
     
     @_('WRITE value SEMICOLON')
     def command(self,p):        
         if self.get(p.value):
-            output = asm.put(self.get(p.value))
+            if not self.get(p.value).is_initialized:
+                raise Exception(f"Zmienna {p.value} nie została zainicjalizowana")
+            output = asm.put(self.get(p.value).id_num)
             return [f"{output}"]
         elif type(p.value) == int:
             return [
@@ -178,22 +183,22 @@ class CompilerParser(DeclarationsParser):
         if(p.expression[1] == "not_operation"):
             if(type(p.expression[0]) == int):
                 output.append(asm.set(p.expression[0]))
-                output.append(asm.store(self.get(p.ID)))
+                output.append(asm.store(self.get(p.ID).id_num))
             else:
                 output.append(asm.load(self.get(p.expression[0])))
-                output.append(asm.store(self.get(p.ID)))
+                output.append(asm.store(self.get(p.ID).id_num))
         else:
-            output += p.expression[0] + [asm.store(self.get(p.ID))]
+            output += p.expression[0] + [asm.store(self.get(p.ID).id_num)]
             
         return output
     
     @_('declarations COMMA ID')
     def declarations(self,p):
-        pass
+        return p.declarations + [p.ID]
     
     @_('ID')
     def declarations(self,p):
-        pass
+        return [p.ID]
     
     @_('value')
     def expression(self,p):
@@ -207,13 +212,25 @@ class CompilerParser(DeclarationsParser):
             return (p.value0 + p.value1, "not_operation")
         elif type(p.value0) == str and type(p.value1) == int:
             output.append(asm.set(p.value1))
-            output.append(asm.add(self.get(p.value0)))
+            if self.get(p.value0).is_param:
+                output.append(asm.addi(self.get(p.value0).id_num))
+            else:
+                output.append(asm.add(self.get(p.value0).id_num))
         elif type(p.value0) == int and type(p.value1) == str:
             output.append(asm.set(p.value0))
-            output.append(asm.add(self.get(p.value1)))
+            if self.get(p.value1).is_param:
+                output.append(asm.addi(self.get(p.value1).id_num))
+            else:
+                output.append(asm.add(self.get(p.value1).id_num))
         elif type(p.value0) == str and type(p.value1) == str:
-            output.append(asm.load(self.get(p.value0)))
-            output.append(asm.add(self.get(p.value1)))
+            if self.get(p.value0).is_param:
+                output.append(asm.loadi(self.get(p.value0)))
+            else:
+                output.append(asm.load(self.get(p.value0)))
+            if self.get(p.value1).is_param:
+                output.append(asm.addi(self.get(p.value1).id_num))
+            else:
+                output.append(asm.add(self.get(p.value1).id_num))
         
         return (output, "operation")
     
@@ -229,14 +246,26 @@ class CompilerParser(DeclarationsParser):
         elif type(p.value0) == str and type(p.value1) == int:
             output.append(asm.set(p.value1))
             output.append(asm.store(1))
-            output.append(asm.load(self.get(p.value0)))
+            if self.get(p.value0).is_param:
+                output.append(asm.loadi(self.get(p.value0).id_num))
+            else:
+                output.append(asm.load(self.get(p.value0).id_num))
             output.append(asm.sub(1))
         elif type(p.value0) == int and type(p.value1) == str:
             output.append(asm.set(p.value0))
-            output.append(asm.sub(self.get(p.value1)))
+            if self.get(p.value1).is_param:
+                output.append(asm.subi(self.get(p.value1).id_num))
+            else:
+                output.append(asm.sub(self.get(p.value1).id_num))
         elif type(p.value0) == str and type(p.value1) == str:
-            output.append(asm.load(self.get(p.value0)))
-            output.append(asm.sub(self.get(p.value1)))
+            if self.get(p.value0).is_param:
+                output.append(asm.loadi(self.get(p.value0).id_num))
+            else:
+                output.append(asm.load(self.get(p.value0).id_num))
+            if self.get(p.value1).is_param:
+                output.append(asm.subi(self.get(p.value1).id_num))
+            else:
+                output.append(asm.sub(self.get(p.value1).id_num))
         
         return (output, "operation")
     
@@ -249,36 +278,64 @@ class CompilerParser(DeclarationsParser):
         return p.ID
     
     @_('value EQ value')
-    def condition(self, p):    
+    def condition(self, p):
+        output = []
         if(type(p.value0) == str and type(p.value1) == str):
-            return ([
-                asm.load(self.get(p.value0)),
-                asm.sub(self.get(p.value1)),
-                asm.store(1),
-                asm.load(self.get(p.value1)),
-                asm.sub(self.get(p.value0)),
-                asm.add(1)
-            ], asm.jpos())
+        
+            if self.get(p.value0).is_param:
+                output.append(asm.loadi(self.get(p.value0).id_num))
+            else:  
+                output.append(asm.load(self.get(p.value0).id_num))
+                
+            if self.get(p.value1).is_param:
+                output.append(asm.subi(self.get(p.value1).id_num))
+            else:   
+                output.append(asm.sub(self.get(p.value1).id_num))
+                
+            output.append(asm.store(1))
+            
+            if self.get(p.value1).is_param:
+                output.append(asm.loadi(self.get(p.value1).id_num))
+            else:
+                output.append(asm.load(self.get(p.value1).id_num))
+                
+            if self.get(p.value0).is_param:
+                output.append(asm.subi(self.get(p.value0).id_num))
+            else:
+                output.append(asm.sub(self.get(p.value0).id_num))
+            
+            output.append(asm.add(1))
+    
+            return (output, asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
-            return ([
-                asm.set(p.value1),
-                asm.store(1),
-                asm.load(self.get(p.value0)),
-                asm.sub(1),
-                asm.store(1),
-                asm.set(p.value1),
-                asm.sub(self.get(p.value0)),
-                asm.add(1)
-            ], asm.jpos())
+            output.append(asm.set(p.value1))
+            output.append(asm.store(1))
+            
+            if self.get(p.value0).is_param:
+                output.append(asm.loadi(self.get(p.value0).id_num))
+            else:
+                output.append(asm.load(self.get(p.value0).id_num))
+                
+            output.append(asm.sub(1))
+            output.append(asm.store(1))
+            output.append(asm.set(p.value1))
+            
+            if self.get(p.value0).is_param:
+                output.append(asm.subi(self.get(p.value0).id_num))
+            else:
+                output.append(asm.sub(self.get(p.value0).id_num))
+            output.append(asm.add(1))
+            
+            return (output, asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.get(p.value1)),
+                asm.load(self.get(p.value1).id_num),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value0),
-                asm.sub(self.get(p.value1)),
+                asm.sub(self.get(p.value1).id_num),
                 asm.add(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -291,33 +348,33 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):    
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value0)),
-                asm.sub(self.get(p.value1)),
+                asm.load(self.get(p.value0).id_num),
+                asm.sub(self.get(p.value1).id_num),
                 asm.store(1),
-                asm.load(self.get(p.value1)),
-                asm.sub(self.get(p.value0)),
+                asm.load(self.get(p.value1).id_num),
+                asm.sub(self.get(p.value0).id_num),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.get(p.value0)),
+                asm.load(self.get(p.value0).id_num),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value1),
-                asm.sub(self.get(p.value0)),
+                asm.sub(self.get(p.value0).id_num),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.get(p.value1)),
+                asm.load(self.get(p.value1).id_num),
                 asm.sub(1),
                 asm.store(1),
                 asm.set(p.value0),
-                asm.sub(self.get(p.value1)),
+                asm.sub(self.get(p.value1).id_num),
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -330,21 +387,21 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):    
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value0)), 
-                asm.sub(self.get(p.value1)),
+                asm.load(self.get(p.value0).id_num), 
+                asm.sub(self.get(p.value1).id_num),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.get(p.value0)),
+                asm.load(self.get(p.value0).id_num),
                 asm.sub(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                asm.set(self.get(p.value1)), 
+                asm.set(self.get(p.value1).id_num), 
                 asm.store(1),
-                asm.set(self.get(p.value0)),
+                asm.set(self.get(p.value0).id_num),
                 asm.sub(1)
             ], asm.jzero())
         else:
@@ -358,19 +415,19 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):     
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value1)), 
-                asm.sub(self.get(p.value0)),
+                asm.load(self.get(p.value1).id_num), 
+                asm.sub(self.get(p.value0).id_num),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1), 
-                asm.sub(self.get(p.value0))
+                asm.sub(self.get(p.value0).id_num)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
-                asm.set(self.get(p.value0)), 
+                asm.set(self.get(p.value0).id_num), 
                 asm.store(1), 
-                asm.load(self.get(p.value1)),
+                asm.load(self.get(p.value1).id_num),
                 asm.sub(1)
             ], asm.load())
         else:
@@ -383,19 +440,19 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):        
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value1)),
-                asm.sub(self.get(p.value0))
+                asm.load(self.get(p.value1).id_num),
+                asm.sub(self.get(p.value0).id_num)
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
-                asm.sub(self.get(p.value0))
+                asm.sub(self.get(p.value0).id_num)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
                 asm.store(1),
-                asm.load(self.get(p.value1)),
+                asm.load(self.get(p.value1).id_num),
                 asm.sub(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
@@ -408,20 +465,20 @@ class CompilerParser(DeclarationsParser):
     def condition(self, p):
         if(type(p.value0) == str and type(p.value1) == str):
             return ([
-                asm.load(self.get(p.value0)),
-                asm.sub(self.get(p.value1))
+                asm.load(self.get(p.value0).id_num),
+                asm.sub(self.get(p.value1).id_num)
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
             return ([
                 asm.set(p.value1),
                 asm.store(1),
-                asm.load(self.get(p.value0)),
+                asm.load(self.get(p.value0).id_num),
                 asm.sub(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
             return ([
                 asm.set(p.value0),
-                asm.sub(self.get(p.value1))
+                asm.sub(self.get(p.value1).id_num)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == int):
             if not(p.value0 <= p.value1):
@@ -449,7 +506,6 @@ class CompilerParser(DeclarationsParser):
             raise Exception(f"Nie zadeklarowana zmienna {name}")
         return got
         
-    
     def get_current_proc_name(self):
         for proc in self.proc_order:
             if proc[1] == self.current_proc:
