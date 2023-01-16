@@ -3,12 +3,13 @@ from lex import CompilerLexer
 import sys
 
 class VariableData():
-    def __init__(self, id_num, is_param, is_initialized):
+    def __init__(self, id_num, is_param, is_initialized, needs_initialization):
         self.id_num = id_num
         self.is_param = is_param
         self.is_initialized = is_initialized
+        self.needs_initialization = needs_initialization
     def  __repr__(self):
-        return  f"Var({self.id_num}, {self.is_param}, {self.is_initialized})"
+        return  f"Var({self.id_num}, {self.is_param}, {self.is_initialized}, {self.needs_initialization})"
 
 class DeclarationsParser(Parser):
     tokens = CompilerLexer.tokens
@@ -39,12 +40,12 @@ class DeclarationsParser(Parser):
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False)
+            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False, False)
         for var in p.declarations:
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), False, False)
-        self.p_cells[(p.proc_head[0], "$ret")] = VariableData(self.get_available_index(), True, False)
+            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), False, False, False)
+        self.p_cells[(p.proc_head[0], "$ret")] = VariableData(self.get_available_index(), True, False, False)
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
@@ -53,8 +54,8 @@ class DeclarationsParser(Parser):
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False)
-        self.p_cells[(p.proc_head[0], "$ret")] = VariableData(self.get_available_index(), True, False)
+            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False, False)
+        self.p_cells[(p.proc_head[0], "$ret")] = VariableData(self.get_available_index(), True, False, False)
 
     @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
     def proc_head(self, p):
@@ -70,7 +71,7 @@ class DeclarationsParser(Parser):
         for var in p.declarations:
             if ("main", var) in self.p_cells:
                 raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[("main", var)] = VariableData(self.get_available_index(), False, False)
+            self.p_cells[("main", var)] = VariableData(self.get_available_index(), False, False, False)
             
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):

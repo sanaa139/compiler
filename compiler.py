@@ -22,9 +22,11 @@ class CompilerParser(DeclarationsParser):
     @_('procedures main')
     def program_all(self, p):
         output = [f"JUMP E_main"] + p.procedures + p.main
+        print("PRZED USUNIECIEM LABELI")
         print(output)
         output = self.delete_labels(output)
         output += ["HALT"]
+        print("PO USUNIECIU LABELI LABELI")
         print(output)
         with open("./moje_wyniki/wyniki.mr", "w") as file:
             file.write("\n".join(output))
@@ -39,7 +41,9 @@ class CompilerParser(DeclarationsParser):
     
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
-        output = ["E_" + p.proc_head[0]] + p.commands
+        index = self.get("$ret", p.proc_head[0]).id_num
+        output = ["E_" + p.proc_head[0]] + p.commands + [f"JUMPI {index}"]
+        
         self.current_proc += 1
         return output
     
@@ -68,7 +72,7 @@ class CompilerParser(DeclarationsParser):
             
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):
-        main_output_instructions = p.commands
+        main_output_instructions = ["E_main"] + p.commands
         main_output_instructions = self.delete_labels(main_output_instructions) + ["HALT"]
                 
         self.current_proc += 1
@@ -150,11 +154,18 @@ class CompilerParser(DeclarationsParser):
         
         output = []
         variables_from_proc = [item[1] for item in self.p_cells if item[0] == p.proc_head[0]]
+        
+        print("HABIDNE")
+        for var_proc in variables_from_proc:
+            print(var_proc)
+            print(self.get(var_proc,p.proc_head[0]).is_initialized)
+            print(self.get(var_proc,p.proc_head[0]).needs_initialization)
+        
         for var_main, var_proc in zip(p.proc_head[1], variables_from_proc):
             output.append(asm.set(self.get(var_main).id_num))
             output.append(asm.store(self.get(var_proc, p.proc_head[0]).id_num))
-            if self.get(var_main).is_initialized is True:
-                self.get(var_proc, p.proc_head[0]).is_initialized = True
+            if self.get(var_proc, p.proc_head[0]).needs_initialization is True and self.get(var_main).is_initialized is False:
+                raise Exception(f"Zmienna {var_main} nie jest zainicjalizowana")
         
         output.append(asm.set(f"E_{label}"))
         output.append(asm.store(self.get("$ret", p.proc_head[0]).id_num))
@@ -172,8 +183,6 @@ class CompilerParser(DeclarationsParser):
     
     @_('WRITE value SEMICOLON')
     def command(self,p):       
-        print("CURRENT PROC") 
-        print(self.current_proc)
         if self.get(p.value):
             if not self.get(p.value).is_initialized:
                 raise Exception(f"Zmienna {p.value} nie została zainicjalizowana")
@@ -225,16 +234,19 @@ class CompilerParser(DeclarationsParser):
         if type(p.value0) == int and type(p.value1) == int:
             return (p.value0 + p.value1, "not_operation")
         elif type(p.value0) == str and type(p.value1) == int:
-            self.check_if_initialized(p.value0)
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             output.append(asm.set(p.value1))
             output.append(self.GEN_ADD((p.value0)))
         elif type(p.value0) == int and type(p.value1) == str:
-            self.check_if_initialized(p.value1)
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             output.append(asm.set(p.value0))
             output.append(self.GEN_ADD((p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
-            self.check_if_initialized(p.value0)
-            self.check_if_initialized(p.value1)
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
             output.append(self.GEN_LOAD((p.value0)))
             output.append(self.GEN_ADD((p.value1)))
         
@@ -250,14 +262,22 @@ class CompilerParser(DeclarationsParser):
             else:
                 return (p.value0 - p.value1, "not_operation")
         elif type(p.value0) == str and type(p.value1) == int:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             output.append(asm.set(p.value1))
             output.append(asm.store(1))
             output.append(self.GEN_LOAD((p.value0)))
             output.append(asm.sub(1))
         elif type(p.value0) == int and type(p.value1) == str:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             output.append(asm.set(p.value0))
             output.append(self.GEN_SUB((p.value1)))
         elif type(p.value0) == str and type(p.value1) == str:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
+            
             output.append(self.GEN_LOAD((p.value0)))
             output.append(self.GEN_SUB((p.value1)))
          
@@ -275,6 +295,9 @@ class CompilerParser(DeclarationsParser):
     @_('value EQ value')
     def condition(self, p):
         if(type(p.value0) == str and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
             return ([
                 self.GEN_LOAD((p.value0)), 
                 self.GEN_SUB((p.value1)),
@@ -284,6 +307,8 @@ class CompilerParser(DeclarationsParser):
                 asm.add(1)
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             return ([
                 asm.set(p.value1),
                 asm.store(1),
@@ -295,6 +320,8 @@ class CompilerParser(DeclarationsParser):
                 asm.add(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             return ([
                 asm.set(p.value0),
                 asm.store(1),
@@ -314,6 +341,9 @@ class CompilerParser(DeclarationsParser):
     @_('value NEQ value')
     def condition(self, p):  
         if(type(p.value0) == str and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
             return ([
                 self.GEN_LOAD((p.value0)),
                 self.GEN_SUB((p.value1)),                
@@ -323,6 +353,8 @@ class CompilerParser(DeclarationsParser):
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             return ([
                 asm.set(p.value1),
                 asm.store(1),
@@ -334,6 +366,8 @@ class CompilerParser(DeclarationsParser):
                 asm.add(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             return ([
                 asm.set(p.value0),
                 asm.store(1),
@@ -353,11 +387,16 @@ class CompilerParser(DeclarationsParser):
     @_('value GREATER_THAN value')
     def condition(self, p):    
         if(type(p.value0) == str and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
             return ([
                 self.GEN_LOAD((p.value0)), 
                 self.GEN_SUB((p.value1)),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             return ([
                 asm.set(p.value1),
                 asm.store(1),
@@ -365,6 +404,8 @@ class CompilerParser(DeclarationsParser):
                 asm.sub(1)
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             return ([
                 asm.set((p.value1).id_num), 
                 asm.store(1),
@@ -381,16 +422,23 @@ class CompilerParser(DeclarationsParser):
     @_('value LESS_THAN value')
     def condition(self, p):     
         if(type(p.value0) == str and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
             return ([
                 self.GEN_LOAD((p.value1)), 
                 self.GEN_SUB((p.value0)),
             ], asm.jzero())
         elif(type(p.value0) == str and type(p.value1) == int):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             return ([
                 asm.set(p.value1), 
                 self.GEN_SUB((p.value0))
             ], asm.jzero())
         elif(type(p.value0) == int and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             return ([
                 asm.set((p.value0).id_num), 
                 asm.store(1), 
@@ -406,16 +454,23 @@ class CompilerParser(DeclarationsParser):
     @_('value GREATER_THAN_OR_EQUAL value')
     def condition(self, p):        
         if(type(p.value0) == str and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
             return ([
                 self.GEN_LOAD((p.value1)),
                 self.GEN_SUB((p.value0))
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             return ([
                 asm.set(p.value1),
                 self.GEN_SUB((p.value0))
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             return ([
                 asm.set(p.value0),
                 asm.store(1),
@@ -431,11 +486,16 @@ class CompilerParser(DeclarationsParser):
     @_('value LESS_THAN_OR_EQUAL value')
     def condition(self, p):
         if(type(p.value0) == str and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
             return ([
                 self.GEN_LOAD((p.value0)),
                 self.GEN_SUB((p.value1))
             ], asm.jpos())
         elif(type(p.value0) == str and type(p.value1) == int):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
             return ([
                 asm.set(p.value1),
                 asm.store(1),
@@ -443,6 +503,8 @@ class CompilerParser(DeclarationsParser):
                 asm.sub(1)
             ], asm.jpos())
         elif(type(p.value0) == int and type(p.value1) == str):
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
             return ([
                 asm.set(p.value0),
                 self.GEN_SUB((p.value1))
@@ -477,10 +539,15 @@ class CompilerParser(DeclarationsParser):
     
     def check_if_initialized(self, name):
         cur_proc = self.get_current_proc_name()
+        print("W CHECK: ", cur_proc, " ", name)
         got = self.p_cells.get((cur_proc, name))
         
         if got.is_initialized is False:
-            raise Exception(f"Zmienna {name} nie została zainicjalizowana")
+            if got.is_param is False:
+                raise Exception(f"Zmienna {name} nie została zainicjalizowana")
+            else:
+                got.is_initialized = True
+                got.needs_initialization = True
         
     def get_current_proc_name(self):
         for proc in self.proc_order:
