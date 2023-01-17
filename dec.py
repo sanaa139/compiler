@@ -59,8 +59,6 @@ class DeclarationsParser(Parser):
 
     @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
     def proc_head(self, p):
-        print("X")
-        print (p.ID, p.declarations)
         return (p.ID, p.declarations)
     
         

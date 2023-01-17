@@ -5,6 +5,7 @@ from dec import VariableData
 import sys
 from pprint import pprint
 import asm
+import warnings
 
 class CompilerParser(DeclarationsParser):
     tokens = CompilerLexer.tokens
@@ -17,7 +18,8 @@ class CompilerParser(DeclarationsParser):
         self.p_cells = p_cells
         self.proc_order = proc_order
         self.var_passed_to_proc = []
-    
+        self.is_used = {}
+        self.is_set = {}
     
     @_('procedures main')
     def program_all(self, p):
@@ -42,6 +44,7 @@ class CompilerParser(DeclarationsParser):
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
         index = self.get("$ret", p.proc_head[0]).id_num
+        
         output = ["E_" + p.proc_head[0]] + p.commands + [f"JUMPI {index}"]
         
         self.current_proc += 1
@@ -63,10 +66,6 @@ class CompilerParser(DeclarationsParser):
     @_('PROGRAM IS VAR declarations BEGIN commands END')
     def main(self, p):
         main_output_instructions = ["E_main"] + p.commands
-        print(p.declarations)
-        print(p.commands)
-        print(main_output_instructions)
-    
         self.current_proc += 1
         return main_output_instructions
             
@@ -150,16 +149,13 @@ class CompilerParser(DeclarationsParser):
         
     @_('proc_head SEMICOLON')
     def command(self, p):
-        label = self.get_available_index()
+        label = self.get_label()
+        
+        for var in p.proc_head[1]:
+            self.check_if_initialized(var)
         
         output = []
         variables_from_proc = [item[1] for item in self.p_cells if item[0] == p.proc_head[0]]
-        
-        print("HABIDNE")
-        for var_proc in variables_from_proc:
-            print(var_proc)
-            print(self.get(var_proc,p.proc_head[0]).is_initialized)
-            print(self.get(var_proc,p.proc_head[0]).needs_initialization)
         
         for var_main, var_proc in zip(p.proc_head[1], variables_from_proc):
             output.append(asm.set(self.get(var_main).id_num))
@@ -185,7 +181,7 @@ class CompilerParser(DeclarationsParser):
     def command(self,p):       
         if self.get(p.value):
             if not self.get(p.value).is_initialized:
-                raise Exception(f"Zmienna {p.value} nie została zainicjalizowana")
+                warnings.warn(f"Zmienna {p.value} mogła nie zostać zainicjalizowana")
             output = asm.put(self.get(p.value).id_num)
             return [f"{output}"]
         elif type(p.value) == int:
@@ -539,12 +535,11 @@ class CompilerParser(DeclarationsParser):
     
     def check_if_initialized(self, name):
         cur_proc = self.get_current_proc_name()
-        print("W CHECK: ", cur_proc, " ", name)
         got = self.p_cells.get((cur_proc, name))
         
         if got.is_initialized is False:
             if got.is_param is False:
-                raise Exception(f"Zmienna {name} nie została zainicjalizowana")
+                warnings.warn(f"Zmienna {name} mogła nie zostać zainicjalizowana")
             else:
                 got.is_initialized = True
                 got.needs_initialization = True
@@ -584,7 +579,7 @@ class CompilerParser(DeclarationsParser):
         all_labels = {}
         indexOfInstructions = 0
         instructions_after_deletion = []
-      
+   
         for instruction in instructions:
             if instruction.startswith('E'):
                 all_labels[instruction] = indexOfInstructions
@@ -593,12 +588,10 @@ class CompilerParser(DeclarationsParser):
                     instructions_after_deletion.append(instruction)
                     indexOfInstructions += 1
                    
-        print(all_labels) 
         for index, instruction in enumerate(instructions_after_deletion):
                 splitted_instruction = instruction.split()
                 first_word_instruction, second_word_instruction = splitted_instruction[0], splitted_instruction[1]
                 if second_word_instruction in all_labels:
-                    print(second_word_instruction)
                     instructions_after_deletion[index] = first_word_instruction + f" {all_labels[second_word_instruction]}"
             
         return instructions_after_deletion
@@ -606,7 +599,6 @@ class CompilerParser(DeclarationsParser):
 if __name__ == '__main__':
     with open(sys.argv[1], 'r') as f:
         data = f.read()
-    print(data)
     lexer = CompilerLexer()
     dec = DeclarationsParser()
     dec.parse(lexer.tokenize(data))
