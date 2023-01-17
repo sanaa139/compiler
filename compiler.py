@@ -158,8 +158,12 @@ class CompilerParser(DeclarationsParser):
         variables_from_proc = [item[1] for item in self.p_cells if item[0] == p.proc_head[0]]
         
         for var_main, var_proc in zip(p.proc_head[1], variables_from_proc):
-            output.append(asm.set(self.get(var_main).id_num))
+            if self.get(var_main).is_param:        
+                output.append(asm.load(self.get(var_main).id_num))
+            else:
+                output.append(asm.set(self.get(var_main).id_num))
             output.append(asm.store(self.get(var_proc, p.proc_head[0]).id_num))
+            the_same_vars = False
             if self.get(var_proc, p.proc_head[0]).needs_initialization is True and self.get(var_main).is_initialized is False:
                 raise Exception(f"Zmienna {var_main} nie jest zainicjalizowana")
         
