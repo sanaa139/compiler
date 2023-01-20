@@ -9,7 +9,7 @@ import warnings
 
 class CompilerParser(DeclarationsParser):
     tokens = CompilerLexer.tokens
-    number_of_var = 2
+    number_of_var = 7
     label_id = 0
     current_proc = 0
     
@@ -109,7 +109,6 @@ class CompilerParser(DeclarationsParser):
         output += instructions_from_cond + [jump_type]
         return output + p.commands + [endif_label]
          
-    
     @_('WHILE condition DO commands ENDWHILE')
     def command(self,p):
         endwhile_label = self.get_label()
@@ -163,12 +162,13 @@ class CompilerParser(DeclarationsParser):
             else:
                 output.append(asm.set(self.get(var_main).id_num))
             output.append(asm.store(self.get(var_proc, p.proc_head[0]).id_num))
-            the_same_vars = False
+        
             if self.get(var_proc, p.proc_head[0]).needs_initialization is True and self.get(var_main).is_initialized is False:
                 raise Exception(f"Zmienna {var_main} nie jest zainicjalizowana")
         
-        output.append(asm.set(f"E_{label}"))
-        output.append(asm.store(self.get("$ret", p.proc_head[0]).id_num))
+        print("AAAAAAAA")
+        print(p.proc_head[0])
+        output += [asm.set(f"E_{label}"), asm.store(self.get("$ret", p.proc_head[0]).id_num)]
         
         for var in p.proc_head[1]:
             self.get(var).is_initialized = True
@@ -201,12 +201,10 @@ class CompilerParser(DeclarationsParser):
         
         if(p.expression[1] == "not_operation"):
             if(type(p.expression[0]) == int):
-                output.append(asm.set(p.expression[0]))
-                output.append(self.GEN_STORE(p.ID))
+                output += [asm.set(p.expression[0]), self.GEN_STORE(p.ID)]
                 self.get(p.ID).is_initialized = True
             else:
-                output.append(self.GEN_LOAD((p.expression[0])))
-                output.append(self.GEN_STORE(p.ID))
+                output += [self.GEN_LOAD((p.expression[0])), self.GEN_STORE(p.ID)]
                 self.get(p.ID).is_initialized = True
         else:
             output += p.expression[0] + [self.GEN_STORE(p.ID)]
@@ -236,19 +234,16 @@ class CompilerParser(DeclarationsParser):
         elif type(p.value0) == str and type(p.value1) == int:
             if self.get_current_proc_name() != "main":
                 self.check_if_initialized(p.value0)
-            output.append(asm.set(p.value1))
-            output.append(self.GEN_ADD((p.value0)))
+            output += [asm.set(p.value1), self.GEN_ADD((p.value0))]
         elif type(p.value0) == int and type(p.value1) == str:
             if self.get_current_proc_name() != "main":
                 self.check_if_initialized(p.value1)
-            output.append(asm.set(p.value0))
-            output.append(self.GEN_ADD((p.value1)))
+            output += [asm.set(p.value0), self.GEN_ADD((p.value1))]
         elif type(p.value0) == str and type(p.value1) == str:
             if self.get_current_proc_name() != "main":
                 self.check_if_initialized(p.value0)
                 self.check_if_initialized(p.value1)
-            output.append(self.GEN_LOAD((p.value0)))
-            output.append(self.GEN_ADD((p.value1)))
+            output += [self.GEN_LOAD((p.value0)), self.GEN_ADD((p.value1))]
         
         return (output, "operation")
     
@@ -264,24 +259,75 @@ class CompilerParser(DeclarationsParser):
         elif type(p.value0) == str and type(p.value1) == int:
             if self.get_current_proc_name() != "main":
                 self.check_if_initialized(p.value0)
-            output.append(asm.set(p.value1))
-            output.append(asm.store(1))
-            output.append(self.GEN_LOAD((p.value0)))
-            output.append(asm.sub(1))
+            output += [asm.set(p.value1), asm.store(1), self.GEN_LOAD((p.value0)), asm.sub(1)]
         elif type(p.value0) == int and type(p.value1) == str:
             if self.get_current_proc_name() != "main":
                 self.check_if_initialized(p.value1)
-            output.append(asm.set(p.value0))
-            output.append(self.GEN_SUB((p.value1)))
+            output += [asm.set(p.value0), self.GEN_SUB((p.value1))]
+        elif type(p.value0) == str and type(p.value1) == str:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
+            output += [self.GEN_LOAD((p.value0)), self.GEN_SUB((p.value1))]
+        
+        return (output, "operation")
+    
+    @_('value MUL value')
+    def expression(self,p):
+        output = []
+        
+        if type(p.value0) == int and type(p.value1) == int:
+            output += [asm.set(p.value0), asm.store(2), asm.set(p.value1), asm.store(3)]
+        elif type(p.value0) == str and type(p.value1) == int:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+            output += [self.GEN_LOAD((p.value0)), asm.store(2), asm.set(p.value1), asm.store(3)]
+        elif type(p.value0) == int and type(p.value1) == str:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
+            output += [asm.set(p.value0), asm.store(2), self.GEN_LOAD((p.value1)), asm.store(3)]
         elif type(p.value0) == str and type(p.value1) == str:
             if self.get_current_proc_name() != "main":
                 self.check_if_initialized(p.value0)
                 self.check_if_initialized(p.value1)
             
-            output.append(self.GEN_LOAD((p.value0)))
-            output.append(self.GEN_SUB((p.value1)))
-         
+        output += [
+                    asm.set(1), asm.store(1), asm.load(2), asm.store(5), asm.load(3), asm.store(6),
+                    asm.set(0), asm.store(4), asm.load(6), "JZERO E_ENDWHILE", "E_WHILE_BODY", asm.half(), asm.add(0), asm.add(1), asm.sub(6),
+                    "JPOS E_ENDIF", asm.load(4), asm.add(5), asm.store(4), "E_ENDIF", asm.load(5), asm.add(0), asm.store(5),
+                    asm.load(6), asm.half(), asm.store(6), "JPOS E_WHILE_BODY", "E_ENDWHILE", asm.load(4) 
+                ]
         
+        return (output, "operation")
+    
+    @_('value DIV value')
+    def expression(self,p):
+        output = []
+        
+        if type(p.value0) == int and type(p.value1) == int:
+            output += [asm.set(p.value0), asm.store(2), asm.set(p.value1), asm.store(3)]
+        elif type(p.value0) == str and type(p.value1) == int:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)   
+            output += [self.GEN_LOAD((p.value0)), asm.store(2), asm.set(p.value1), asm.store(3)]
+        elif type(p.value0) == int and type(p.value1) == str:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value1)
+            output += [asm.set(p.value0), asm.store(2), self.GEN_LOAD((p.value1)), asm.store(3)]
+        elif type(p.value0) == str and type(p.value1) == str:
+            if self.get_current_proc_name() != "main":
+                self.check_if_initialized(p.value0)
+                self.check_if_initialized(p.value1)
+            output += [self.GEN_LOAD((p.value0)), asm.store(2), self.GEN_LOAD((p.value1)), asm.store(3)]
+        
+        output += [
+                    asm.set(1), asm.store(1), asm.load(2), asm.store(5), asm.load(3), asm.store(6),
+                    asm.set(0), asm.store(4), asm.load(6), asm.sub(5), "JPOS E_3", "E_0", asm.set(0), asm.store(7), asm.load(3),
+                    asm.store(6), asm.sub(5), "JPOS E_2", "E_1", asm.load(7), asm.add(1), asm.store(7), asm.load(6), asm.add(0),
+                    asm.store(6), asm.sub(5), "JZERO E_1", "E_2", asm.load(6), asm.half(), asm.store(6), asm.load(7), asm.half(),
+                    asm.store(7), asm.add(4), asm.store(4), asm.load(5), asm.sub(6), asm.store(5), asm.add(1), asm.sub(3), "JPOS E_0", "E_3", asm.load(4)
+                ]
+    
         return (output, "operation")
     
     @_('NUM')
@@ -515,8 +561,6 @@ class CompilerParser(DeclarationsParser):
             else:
                 return ([], "!")
     
-    
-    
     def get_label(self):
         label = "E_" + str(self.label_id)
         self.label_id += 1
@@ -594,9 +638,10 @@ class CompilerParser(DeclarationsParser):
                    
         for index, instruction in enumerate(instructions_after_deletion):
                 splitted_instruction = instruction.split()
-                first_word_instruction, second_word_instruction = splitted_instruction[0], splitted_instruction[1]
-                if second_word_instruction in all_labels:
-                    instructions_after_deletion[index] = first_word_instruction + f" {all_labels[second_word_instruction]}"
+                if instruction != "HALF":
+                    first_word_instruction, second_word_instruction = splitted_instruction[0], splitted_instruction[1]
+                    if second_word_instruction in all_labels:
+                        instructions_after_deletion[index] = first_word_instruction + f" {all_labels[second_word_instruction]}"
             
         return instructions_after_deletion
     
@@ -608,7 +653,6 @@ if __name__ == '__main__':
     dec.parse(lexer.tokenize(data))
     declared_variables = dec.p_cells
     parser = CompilerParser(dec.p_cells, dec.proc_order)
-    #print(list(lexer.tokenize(data)))
     parser.parse(lexer.tokenize(data))
 
     print("P_cells:")

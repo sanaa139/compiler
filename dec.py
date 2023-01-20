@@ -17,7 +17,7 @@ class DeclarationsParser(Parser):
     def __init__(self):
         self.p_cells = {}
         self.proc_order = []
-        self.number_of_var = 2
+        self.number_of_var = 7
         self.proc_num = 0
         
     
@@ -133,6 +133,14 @@ class DeclarationsParser(Parser):
         pass
     
     @_('value MINUS value')
+    def expression(self,p):
+        pass
+    
+    @_('value MUL value')
+    def expression(self,p):
+        pass
+    
+    @_('value DIV value')
     def expression(self,p):
         pass
     

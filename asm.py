@@ -39,3 +39,6 @@ def store(num: int):
 
 def storei(num: int):
     return f"STOREI {num}"
+
+def half():
+    return f"HALF"
