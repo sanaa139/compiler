@@ -17,8 +17,9 @@ class DeclarationsParser(Parser):
     def __init__(self):
         self.p_cells = {}
         self.proc_order = []
-        self.number_of_var = 7
+        self.number_of_var = 8
         self.proc_num = 0
+        self.proc_names = []
         
     
     @_('procedures main')
@@ -36,6 +37,7 @@ class DeclarationsParser(Parser):
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
         self.proc_order.append((p.proc_head[0], self.get_proc_order()))
+        self.proc_names.append(p.proc_head[0])
         
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
@@ -50,6 +52,7 @@ class DeclarationsParser(Parser):
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
         self.proc_order.append((p.proc_head[0], self.get_proc_order()))
+        self.proc_names.append(p.proc_head[0])
         
         for var in p.proc_head[1]:
             if (p.proc_head[0], var) in self.p_cells:
@@ -144,6 +147,10 @@ class DeclarationsParser(Parser):
     def expression(self,p):
         pass
     
+    @_('value MOD value')
+    def expression(self,p):
+        pass
+    
     @_('NUM')
     def value(self, p):
         pass
@@ -196,3 +203,4 @@ if __name__ == '__main__':
     print(list(lexer.tokenize(data)))
     print(parser.p_cells)
     print(parser.proc_order)
+    print(parser.proc_names)
