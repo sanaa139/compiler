@@ -200,7 +200,6 @@ if __name__ == '__main__':
     lexer = CompilerLexer()
     parser = DeclarationsParser()
     parser.parse(lexer.tokenize(data))
-    print(list(lexer.tokenize(data)))
     print(parser.p_cells)
     print(parser.proc_order)
     print(parser.proc_names)

@@ -160,9 +160,6 @@ class CompilerParser(DeclarationsParser):
                 output.append(asm.set(self.get(var_main).id_num))
             output.append(asm.store(self.get(var_proc, p.proc_head[0]).id_num))
         
-            if self.get(var_proc, p.proc_head[0]).needs_initialization is True and self.get(var_main).is_initialized is False:
-                raise Exception(f"Zmienna {var_main} nie jest zainicjalizowana")
-        
         output += [asm.set(f"E_{label}"), asm.store(self.get("$ret", p.proc_head[0]).id_num)]
         
         for var in p.proc_head[1]:
