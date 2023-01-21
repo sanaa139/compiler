@@ -25,12 +25,8 @@ class CompilerParser(DeclarationsParser):
     @_('procedures main')
     def program_all(self, p):
         output = [f"JUMP E_main"] + p.procedures + p.main
-        #print("PRZED USUNIECIEM LABELI")
-        #print(output)
         output = self.delete_labels(output)
         output += ["HALT"]
-        #print("PO USUNIECIU LABELI LABELI")
-        #print(output)
         with open("./moje_wyniki/wyniki.mr", "w") as file:
             file.write("\n".join(output))
     
@@ -137,7 +133,6 @@ class CompilerParser(DeclarationsParser):
         output += [go_to_repeat_label] + p.commands + instructions_from_cond
         if jump_type != "":
             output += [jump_type + go_to_repeat_label]
-        #print(output)
         return output
         
     @_('proc_head SEMICOLON')
@@ -682,7 +677,6 @@ class CompilerParser(DeclarationsParser):
                     instructions_after_deletion.append(instruction)
                     indexOfInstructions += 1
         
-        #print(all_labels)
         for index, instruction in enumerate(instructions_after_deletion):
                 splitted_instruction = instruction.split()
                 if instruction != "HALF":
@@ -701,7 +695,4 @@ if __name__ == '__main__':
     declared_variables = dec.p_cells
     parser = CompilerParser(dec.p_cells, dec.proc_order, dec.proc_names)
     parser.parse(lexer.tokenize(data))
-
-    #print("P_cells:")
-    #print(parser.p_cells)
     
