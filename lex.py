@@ -12,7 +12,7 @@ class CompilerLexer(Lexer):
         'READ', 'WRITE',
         'PLUS', 'MINUS', 'MUL', 'DIV', 'MOD',
         'EQ', 'NEQ', 'GREATER_THAN', 'LESS_THAN', 'GREATER_THAN_OR_EQUAL', 'LESS_THAN_OR_EQUAL',
-        'COLON', 'SEMICOLON', 'COMMA', 'LEFT_PARENTHESIS', 'RIGHT_PARENTHESIS',
+        'SEMICOLON', 'COMMA', 'LEFT_PARENTHESIS', 'RIGHT_PARENTHESIS',
         'NUM', 'ID'
     }
 
@@ -45,7 +45,6 @@ class CompilerLexer(Lexer):
     LESS_THAN_OR_EQUAL = r'<='
     GREATER_THAN = r'>'
     LESS_THAN = r'<'
-    COLON = r':'
     SEMICOLON = r';'
     COMMA = r','
     LEFT_PARENTHESIS = r'\('
@@ -53,9 +52,14 @@ class CompilerLexer(Lexer):
 
     ignore = ' \t'
         
-    ignore_comment = r'\[[^\]]*\]'
-
-    ignore_new_lines = r'\n+'
+    @_(r'\n+')
+    def ignore_newline(self, t): 
+        self.lineno += len(t.value)
+        
+    @_(r'[\[][^\]]*[\]]')
+    def ignore_comment(self, t): 
+        self.lineno += t.value.count('\n')
+        
     NUM = r'\d+'
     ID = r'[_a-z]+'
 
@@ -64,5 +68,5 @@ if __name__ == '__main__':
         data = f.read()
     lexer = CompilerLexer()
     for tok in lexer.tokenize(data):
-        print('type=%r, value=%r' % (tok.type, tok.value))
+        print(tok)
 

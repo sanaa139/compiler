@@ -1,6 +1,7 @@
 from sly import Parser
 from lex import CompilerLexer
 import sys
+from exception import MyException
 
 class VariableData():
     def __init__(self, id_num, is_param, is_initialized, needs_initialization):
@@ -37,27 +38,35 @@ class DeclarationsParser(Parser):
     @_('PROCEDURE proc_head IS VAR declarations BEGIN commands END')
     def procedure(self, p):
         self.proc_order.append((p.proc_head[0], self.get_proc_order()))
-        self.proc_names.append(p.proc_head[0])
+        
+        if p.proc_head[0] in self.proc_names:
+            raise MyException(f"Procedura o nazwie {p.proc_head[0]} zadeklarowana drugi raz w linii {p.lineno}")
+        else:
+            self.proc_names.append(p.proc_head[0])
         
         for var in p.proc_head[1]:
-            if (p.proc_head[0], var) in self.p_cells:
-                raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False, False)
+            if (p.proc_head[0], var[0]) in self.p_cells:
+                raise MyException(f"Druga deklaracja zmiennej {var[0]} w linii {var[1]}")
+            self.p_cells[(p.proc_head[0], var[0])] = VariableData(self.get_available_index(), True, False, False)
         for var in p.declarations:
-            if (p.proc_head[0], var) in self.p_cells:
-                raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), False, False, False)
+            if (p.proc_head[0], var[0]) in self.p_cells:
+                raise MyException(f"Druga deklaracja zmiennej {var[0]} w linii {var[1]}")
+            self.p_cells[(p.proc_head[0], var[0])] = VariableData(self.get_available_index(), False, False, False)
         self.p_cells[(p.proc_head[0], "$ret")] = VariableData(self.get_available_index(), True, False, False)
     
     @_('PROCEDURE proc_head IS BEGIN commands END')
     def procedure(self, p):
         self.proc_order.append((p.proc_head[0], self.get_proc_order()))
-        self.proc_names.append(p.proc_head[0])
+        
+        if p.proc_head[0] in self.proc_names:
+            raise MyException(f"Procedura o nazwie {p.proc_head[0]} zadeklarowana drugi raz w linii {p.lineno}")
+        else:
+            self.proc_names.append(p.proc_head[0])
         
         for var in p.proc_head[1]:
-            if (p.proc_head[0], var) in self.p_cells:
-                raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[(p.proc_head[0], var)] = VariableData(self.get_available_index(), True, False, False)
+            if (p.proc_head[0], var[0]) in self.p_cells:
+                raise MyException(f"Druga deklaracja zmiennej {var[0]} w linii {var[1]}")
+            self.p_cells[(p.proc_head[0], var[0])] = VariableData(self.get_available_index(), True, False, False)
         self.p_cells[(p.proc_head[0], "$ret")] = VariableData(self.get_available_index(), True, False, False)
 
     @_('ID LEFT_PARENTHESIS declarations RIGHT_PARENTHESIS')    
@@ -70,9 +79,9 @@ class DeclarationsParser(Parser):
         self.proc_order.append(("main", self.get_proc_order()))
         
         for var in p.declarations:
-            if ("main", var) in self.p_cells:
-                raise Exception(f"Zmienna {var} została wcześniej zadeklarowana")
-            self.p_cells[("main", var)] = VariableData(self.get_available_index(), False, False, False)
+            if ("main", var[0]) in self.p_cells:
+                raise MyException(f"Druga deklaracja zmiennej {var[0]} w linii {var[1]}")
+            self.p_cells[("main", var[0])] = VariableData(self.get_available_index(), False, False, False)
             
     @_('PROGRAM IS BEGIN commands END')
     def main(self, p):
@@ -121,11 +130,11 @@ class DeclarationsParser(Parser):
     
     @_('declarations COMMA ID')
     def declarations(self,p):
-        return p.declarations + [p.ID]
+        return p.declarations + [(p.ID, p.lineno)]
     
     @_('ID')
     def declarations(self,p):
-        return [p.ID]
+        return [(p.ID, p.lineno)]
     
     @_('value')
     def expression(self,p):
@@ -199,4 +208,9 @@ if __name__ == '__main__':
         data = f.read()
     lexer = CompilerLexer()
     parser = DeclarationsParser()
-    parser.parse(lexer.tokenize(data))
+    try:
+        parser.parse(lexer.tokenize(data))
+    except MyException as e:
+        red = '\033[91m'
+        reset = '\033[0m'
+        print(f"{red}[Error]{reset} {e}")
