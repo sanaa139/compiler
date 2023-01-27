@@ -353,12 +353,17 @@ class CompilerParser(DeclarationsParser):
         e2 = self.get_label()
         e3 = self.get_label()
         e4 = self.get_label()
+        e5 = self.get_label()
+        e6 = self.get_label()
+        
         output += [
-                    asm.load(2), asm.store(5), asm.load(3), f"JZERO E_ENDWHILE_{e1}", asm.sub(5), f"JPOS E_ENDWHILE_{e1}",
+                    asm.load(2), asm.store(5), asm.load(3), f"JZERO E_ENDWHILE2_{e5}", asm.sub(5), f"JPOS E_ENDWHILE_{e1}",
                     f"E_WHILE_BODY_{e2}", asm.load(3), asm.store(6), asm.sub(5), f"JPOS E_INNER_ENDWHILE_{e4}",
                     f"E_INNER_WHILE_BODY_{e3}", asm.load(6), asm.add(0), asm.store(6), asm.sub(5),
                     f"JZERO E_INNER_WHILE_BODY_{e3}", f"E_INNER_ENDWHILE_{e4}", asm.load(6), asm.half(), asm.store(6), asm.load(5), asm.sub(6), asm.store(5),
-                    asm.load(3), asm.sub(5), f"JZERO E_WHILE_BODY_{e2}", f"E_ENDWHILE_{e1}", asm.load(5), asm.store(4),  asm.load(4)
+                    asm.load(3), asm.sub(5), f"JZERO E_WHILE_BODY_{e2}", f"E_ENDWHILE_{e1}",  asm.load(5), asm.store(4),  asm.load(4), f"JUMP E_RESULT_{e6}",
+                    f"E_ENDWHILE2_{e5}", asm.set(0), asm.store(4), f"E_RESULT_{e6}", asm.load(4)
+                    
                 ]
 
         return (output, "operation")
@@ -694,4 +699,3 @@ if __name__ == '__main__':
         red = '\033[91m'
         reset = '\033[0m'
         print(f"{red}[Error]{reset} {e}")
-        sys.exit(1)
